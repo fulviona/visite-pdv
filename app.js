@@ -446,7 +446,39 @@ function clearAll() {
 
   visite = []; save(); render(); el.status.textContent = 'Lista svuotata.';
 }
+function clearImportedPoints() {
+  // Chiede conferma all'utente
+  const msg = [
+    '⚠️ Operazione non reversibile.',
+    'Verranno rimossi SOLO i punti importati da Excel (src="geocode").',
+    'I punti inseriti manualmente resteranno.',
+    '',
+    'Procedere?'
+  ].join('\n');
 
+  if (!confirm(msg)) return;
+
+  const before = visite.length;
+
+  // Teniamo tutto tranne i record importati (src === 'geocode')
+  visite = visite.filter(v => v.src !== 'geocode');
+
+  const removed = before - visite.length;
+
+  // Salva + aggiorna lista
+  save();
+  render();
+
+  // Se la mappa è visibile, aggiorna subito i marker
+  if (map && el.mappa.style.display !== 'none') {
+    const srcPts = visite.filter(v => v.lat && v.lng);
+    const pts = srcPts.map(v => ({ lat: v.lat, lng: v.lng }));
+    const visitedFlags = srcPts.map(v => !!v.visited);
+    addNumberedMarkers(pts, visitedFlags);
+  }
+
+  alert(`Rimossi ${removed} punti importati da Excel.`);
+}
 /* -----------------------------
    MINI-SCHEDA riepilogo percorso
 ----------------------------- */
