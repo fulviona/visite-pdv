@@ -1,0 +1,69 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visite PDV – Free (OSM+OSRM) – Final</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Visite Punti Vendita – Versione Gratuita</h1>
+  </header>
+
+  <section class="panel">
+    <h2>Nuova visita</h2>
+    <div class="grid-2">
+      <input id="pdv-name" placeholder="Nome punto vendita" />
+      <input id="pdv-address" placeholder="Indirizzo (via, città)" />
+    </div>
+    <textarea id="note" placeholder="Note visita"></textarea>
+    <div class="grid-2">
+      <input type="file" id="foto" accept="image/*" capture="environment" />
+      <div class="btn-row">
+        <button id="btn-gps" title="Usa la posizione attuale">📍 Usa posizione attuale</button>
+        <button id="btn-salva">💾 Salva visita</button>
+      </div>
+    </div>
+    <small class="muted">Suggerimento: dopo il GPS puoi comunque correggere indirizzo/nome prima di salvare.</small>
+  </section>
+
+  <section class="panel">
+    <h2>Importa da Excel</h2>
+    <p>Formato richiesto (intestazioni): <code>Cod_Punto</code>, <code>regione_PV</code>, <code>Sede</code>, <code>Indirizzo Sede</code>, <code>Cap Sede</code></p>
+    <input type="file" id="excel" accept=".xlsx" />
+    <div class="btn-row">
+      <button id="btn-importa">📥 Importa</button>
+      <button id="btn-clear">🗑 Cancella tutte le visite</button>
+    </div>
+    <div id="import-status" class="status"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Mappa e percorso</h2>
+    <div class="grid-2">
+      <button id="btn-mappa">🗺️ Mostra mappa + percorso</button>
+      <button id="btn-tsp">🚀 Ottimizza ordine (TSP)</button>
+    </div>
+    <div id="mappa" style="height: 360px; display: none"></div>
+    <h3>Istruzioni turn‑by‑turn</h3>
+    <ol id="istruzioni"></ol>
+  </section>
+
+  <section class="panel">
+    <h2>Lista punti vendita</h2>
+    <ul id="lista" class="lista"></ul>
+  </section>
+
+  <footer>
+    <small class="muted">OpenStreetMap + OSRM. Dati salvati in locale sul dispositivo.</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
