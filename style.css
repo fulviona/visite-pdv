@@ -1,0 +1,7 @@
+
+body{background:#111;color:#eee;font-family:Arial;padding:10px;}
+.panel{background:#222;padding:10px;margin:10px;border-radius:10px;}
+input,textarea,button{width:100%;margin:5px 0;padding:8px;border-radius:8px;}
+ul li{background:#0f141b;padding:6px;margin:5px;border-radius:8px;display:flex;justify-content:space-between;}
+.tag{padding:3px 8px;border-radius:10px;background:#233;}
+.tag.visited{background:#0e3;}

@@ -1,0 +1,35 @@
+
+<!DOCTYPE html><html lang='it'><head>
+<meta charset='UTF-8'/><meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+<title>Visite PDV – Nuovo Excel</title>
+<link rel='stylesheet' href='style.css'/>
+<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
+<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'></script>
+</head><body>
+<h1>Visite PDV – Import Excel aggiornato</h1>
+<section class='panel'>
+<h2>Nuova visita</h2>
+<input id='pdv-name' placeholder='Nome punto vendita'/>
+<input id='pdv-address' placeholder='Indirizzo'/>
+<textarea id='note'></textarea>
+<input type='file' id='foto' accept='image/*'/>
+<button id='btn-salva'>Salva</button>
+</section>
+<section class='panel'>
+<h2>Importa da Excel</h2>
+<input id='excel' type='file'/>
+<button id='btn-importa'>Importa</button>
+<div id='import-status'></div>
+</section>
+<section class='panel'>
+<h2>Mappa</h2>
+<button id='btn-mappa'>Mostra mappa</button>
+<button id='btn-tsp'>Percorso ottimizzato</button>
+<button id='btn-osm'>Apri in OSM</button>
+<button id='btn-pdf'>Esporta PDF</button>
+<div id='mappa' style='height:320px; display:none;'></div>
+<ol id='istruzioni'></ol></section>
+<section class='panel'><h2>Lista PDV</h2><ul id='lista'></ul></section>
+<script src='app.js'></script></body></html>
