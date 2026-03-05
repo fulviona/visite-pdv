@@ -710,6 +710,10 @@ document.addEventListener('DOMContentLoaded', () => {
   el.btnGPS.onclick = fillFromGPS;
   el.btnImport.onclick = importExcel;
   el.btnClear.onclick = clearAll;
+  // NUOVO: rimuovi solo i PDV importati
+  el.btnClearImport = document.getElementById('btn-clear-import');
+  el.btnClearImport.onclick = clearImportedPoints;
+
 
   el.btnMappa.onclick = () => mostraMappa();
 
