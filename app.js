@@ -208,6 +208,7 @@ function addNumberedMarkers(pts, visitedFlags) {
 ----------------------------- */
 let editingIndex = -1;
 
+
 function render() {
     el.lista.innerHTML = '';
 
@@ -238,7 +239,7 @@ function render() {
             save();
             render();
 
-            // Aggiorna marker se la mappa è aperta
+            // Aggiorna marker se mappa aperta
             if (map && el.mappa.style.display !== 'none') {
                 const src = visite.filter(v => v.lat && v.lng);
                 const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
@@ -252,16 +253,13 @@ function render() {
         row.appendChild(right);
         li.appendChild(row);
 
-        /* ---- AZIONI ---- */
+        /* ─── AZIONI ───────────────────────────── */
         const actions = document.createElement('div');
         actions.className = 'actions';
 
         const bEdit = document.createElement('button');
         bEdit.textContent = '✏ Modifica';
-        bEdit.onclick = () => {
-            editingIndex = (editingIndex === i ? -1 : i);
-            render();
-        };
+        bEdit.onclick = () => { editingIndex = (editingIndex === i ? -1 : i); render(); };
 
         const bDel = document.createElement('button');
         bDel.className = 'danger';
@@ -307,13 +305,11 @@ function render() {
             `;
             li.appendChild(ed);
 
-            // Annulla
             ed.querySelector('#e-cancel').onclick = () => {
                 editingIndex = -1;
                 render();
             };
 
-            // Salva
             ed.querySelector('#e-save').onclick = () => {
                 v.nome = ed.querySelector('#e-nome').value.trim();
                 v.address = ed.querySelector('#e-address').value.trim();
@@ -336,20 +332,14 @@ function render() {
                 }
             };
 
-            // Geocoding
             ed.querySelector('#e-geocode').onclick = async () => {
                 const a = ed.querySelector('#e-address').value.trim();
                 if (!a) return alert('Inserisci un indirizzo.');
                 const pos = await geocodeAddress(a);
                 if (!pos) return alert('Indirizzo non trovato.');
-                v.lat = pos.lat;
-                v.lng = pos.lng;
-                v.src = 'geocode';
-                save();
-                alert('Coordinate aggiornate.');
+                v.lat = pos.lat; v.lng = pos.lng; v.src = 'geocode'; save(); alert('Coordinate aggiornate.');
             };
 
-            // GPS
             ed.querySelector('#e-gps').onclick = () => {
                 navigator.geolocation.getCurrentPosition(async gp => {
                     v.lat = gp.coords.latitude;
@@ -373,18 +363,18 @@ function render() {
     -------------------------------------------------- */
     if (visite.length === 0 && map) {
 
-        // 1) Rimuovi percorso OSRM
+        // 1) Rimuovi polyline OSRM
         if (layerRoute) {
             map.removeLayer(layerRoute);
             layerRoute = null;
         }
 
-        // 2) Rimuovi tutti i marker
+        // 2) Rimuovi TUTTI i marker
         map.eachLayer(layer => {
             if (layer instanceof L.Marker) map.removeLayer(layer);
         });
 
-        // 3) Nascondi mini scheda
+        // 3) Nascondi mini-scheda percorso
         el.routeSummary.style.display = 'none';
 
         // 4) Reset vista Italia
