@@ -898,4 +898,3 @@ window.addEventListener('load', () => {
   const scr = document.getElementById('loading-screen');
   if (scr) setTimeout(() => scr.classList.add('hidden'), 400);
 });
-
