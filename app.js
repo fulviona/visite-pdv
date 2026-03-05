@@ -230,7 +230,21 @@ function render() {
     const tag = document.createElement('span');
     tag.className = 'tag' + (v.visited ? ' visited' : '');
     tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
-    tag.onclick = () => { v.visited = !v.visited; save(); render(); };
+    tag.onclick = () => {
+        v.visited = !v.visited;
+        save();
+        render();
+
+    // Aggiorna i marker se la mappa è aperta
+    if (map && el.mappa.style.display !== 'none') {
+       
+        const src = visite.filter(v => v.lat && v.lng);
+        const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
+        const visitedFlags = src.map(v => !!v.visited);
+
+        addNumberedMarkers(pts, visitedFlags);
+    }
+};
     right.appendChild(tag);
 
     row.appendChild(info);
