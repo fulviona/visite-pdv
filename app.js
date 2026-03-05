@@ -513,39 +513,57 @@ function clearAll() {
         map.setView([41.8719, 12.5674], 6);
     }
 }
-
 function clearImportedPoints() {
-  // Chiede conferma all'utente
-  const msg = [
-    '⚠️ Operazione non reversibile.',
-    'Verranno rimossi SOLO i punti importati da Excel (src="geocode").',
-    'I punti inseriti manualmente resteranno.',
-    '',
-    'Procedere?'
-  ].join('\n');
+    // Chiede conferma all'utente
+    const msg = [
+        '⚠️ Operazione non reversibile.',
+        'Verranno rimossi SOLO i punti importati da Excel (src="geocode").',
+        'I punti inseriti manualmente resteranno.',
+        '',
+        'Procedere?'
+    ].join('\n');
 
-  if (!confirm(msg)) return;
+    if (!confirm(msg)) return;
 
-  const before = visite.length;
+    const before = visite.length;
 
-  // Teniamo tutto tranne i record importati (src === 'geocode')
-  visite = visite.filter(v => v.src !== 'geocode');
+    // Teniamo solo i PDV NON importati
+    visite = visite.filter(v => v.src !== 'geocode');
 
-  const removed = before - visite.length;
+    const removed = before - visite.length;
 
-  // Salva + aggiorna lista
-  save();
-  render();
+    // Salva + aggiorna lista
+    save();
+    render();
 
-  // Se la mappa è visibile, aggiorna subito i marker
-  if (map && el.mappa.style.display !== 'none') {
-    const srcPts = visite.filter(v => v.lat && v.lng);
-    const pts = srcPts.map(v => ({ lat: v.lat, lng: v.lng }));
-    const visitedFlags = srcPts.map(v => !!v.visited);
-    addNumberedMarkers(pts, visitedFlags);
-  }
+    // Se la mappa è visibile, aggiorna subito i marker
+    if (map && el.mappa && el.mappa.style.display !== 'none') {
+        const srcPts = visite.filter(v => v.lat && v.lng);
+        const pts = srcPts.map(v => ({ lat: v.lat, lng: v.lng }));
+        const visitedFlags = srcPts.map(v => !!v.visited);
+        addNumberedMarkers(pts, visitedFlags);
+    }
 
-  alert(`Rimossi ${removed} punti importati da Excel.`);
+    // Se dopo la cancellazione non resta nulla → reset completo mappa
+    if (map && visite.length === 0) {
+        // 1) Rimuovi polyline OSRM
+        if (layerRoute) {
+            map.removeLayer(layerRoute);
+            layerRoute = null;
+        }
+        // 2) Rimuovi tutti i marker
+        map.eachLayer(layer => {
+            if (layer instanceof L.Marker) map.removeLayer(layer);
+        });
+        // 3) Nascondi mini‑scheda
+        if (el.routeSummary) el.routeSummary.style.display = 'none';
+        // 4) Reset vista Italia
+        map.setView([41.8719, 12.5674], 6);
+    }
+
+    alert(removed > 0
+        ? `Rimossi ${removed} punti importati da Excel.`
+        : 'Nessun punto importato da Excel da rimuovere.');
 }
 /* -----------------------------
    MINI-SCHEDA riepilogo percorso
