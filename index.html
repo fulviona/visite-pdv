@@ -1,0 +1,54 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visite PDV – Free (Nominatim + OSRM)</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <h1>Visite Punti Vendita – Versione Gratuita</h1>
+
+  <section class="panel">
+    <h2>Nuova visita</h2>
+    <input id="pdv-name" placeholder="Nome punto vendita" />
+    <input id="pdv-address" placeholder="Indirizzo (via, città)" />
+    <textarea id="note" placeholder="Note visita"></textarea>
+    <input type="file" id="foto" accept="image/*" capture="environment" />
+    <button id="btn-salva">Salva visita</button>
+  </section>
+
+  <section class="panel">
+    <h2>Importa da Excel</h2>
+    <p>Colonne richieste: <strong>NOME</strong>, <strong>INDIRIZZO</strong></p>
+    <input type="file" id="excel" accept=".xlsx" />
+    <button id="btn-importa">Importa</button>
+    <div id="import-status" class="status"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Mappa e percorso</h2>
+    <div class="actions">
+      <button id="btn-mappa">Mostra mappa + percorso</button>
+      <button id="btn-tsp">Ottimizza ordine (TSP)</button>
+      <button id="btn-osm">Apri in OpenStreetMap</button>
+      <button id="btn-pdf">Esporta PDF</button>
+    </div>
+    <div id="mappa" style="height: 340px; display: none"></div>
+    <h3>Istruzioni turn‑by‑turn</h3>
+    <ol id="istruzioni"></ol>
+  </section>
+
+  <section class="panel">
+    <h2>Lista punti vendita</h2>
+    <ul id="lista"></ul>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
