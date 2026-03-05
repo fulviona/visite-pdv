@@ -243,6 +243,32 @@ function render() {
         const visitedFlags = src.map(v => !!v.visited);
 
         addNumberedMarkers(pts, visitedFlags);
+      // --- SE NON CI SONO PIÙ PDV: SVUOTA LA MAPPA ---
+if (visite.length === 0) {
+
+    // 1) Rimuove il percorso OSRM
+    if (layerRoute) {
+        map.removeLayer(layerRoute);
+        layerRoute = null;
+    }
+
+    // 2) Rimuove TUTTI i marker
+    if (map) {
+        map.eachLayer(layer => {
+            if (layer instanceof L.Marker) map.removeLayer(layer);
+        });
+    }
+
+    // 3) Nasconde la mini‑scheda riepilogo
+    if (el.routeSummary) {
+        el.routeSummary.style.display = "none";
+    }
+
+    // 4) Reset della mappa (zoom Italia)
+    if (map) {
+        map.setView([41.8719, 12.5674], 6); // Italia
+    }
+}
     }
 };
     right.appendChild(tag);
