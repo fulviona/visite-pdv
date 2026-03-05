@@ -74,6 +74,7 @@ const el = {
   btnClear: document.getElementById('btn-clear'),
   btnMappa: document.getElementById('btn-mappa'),
   btnTSP: document.getElementById('btn-tsp'),
+  btnNav: document.getElementById('btn-nav'),
   fabPDF: document.getElementById('fab-pdf'),
   navModal: document.getElementById('nav-modal')
 };
@@ -246,6 +247,8 @@ el.btnClear.onclick = ()=>{
 
 // ===== Mappa & Routing =====
 let map, layerRoute;
+let lastOrderedPts = null; // memorizza ultimo ordinamento per Naviga
+
 function ensureMap(){
   if(map) return map;
   el.mappa.style.display='block';
@@ -306,47 +309,69 @@ el.btnTSP.onclick = async ()=>{
   if(visite.length<2) return alert('Servono almeno 2 punti');
   const src = visite.filter(v=>v.lat && v.lng);
   const pts = src.map(v=>({lat:v.lat,lng:v.lng}));
-  const ordered = tspOrder(pts);
-  await mostraMappa(ordered);
-  askNavigationApp(ordered);
+  lastOrderedPts = tspOrder(pts);
+  await mostraMappa(lastOrderedPts);
+  // NESSUN popup qui: si userà il bottone "Naviga"
 };
 
 // ===== Scelta app navigazione (default Google Maps) =====
-function askNavigationApp(orderedPts){
-  const modal = el.navModal; modal.classList.remove('hidden');
-  const onChoose=(app)=>{
-    modal.classList.add('hidden');
-    openNavigation(app||'google', orderedPts);
-  };
-  modal.querySelectorAll('[data-app]').forEach(b=> b.onclick=()=> onChoose(b.getAttribute('data-app')));
-  document.getElementById('nav-cancel').onclick=()=> onChoose('google'); // default
-}
-
 function openNavigation(app, orderedPts){
   const coords = orderedPts.map(p=>`${p.lat},${p.lng}`);
   let url='';
   switch(app){
     case 'google':
-      // Google supporta i waypoints (limiti di numero in app). Metto tutte le tappe come waypoints.
       url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords.join('|'))}`;
       break;
     case 'waze':
-      // Waze non supporta multi-waypoint semplice via URL; apro prima tappa.
       url = `https://waze.com/ul?ll=${coords[0]}&navigate=yes`;
       break;
     case 'apple':
-      // Apple Maps: apro destinazione della prima tappa.
       url = `https://maps.apple.com/?daddr=${coords[0]}&dirflg=d`;
       break;
     case 'osm':
-      // OSM può accettare piu' punti.
       url = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(coords.join(';'))}`;
       break;
     default:
       url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords.join('|'))}`;
   }
-  window.open(url, '_blank');
+  // iPhone-safe: chiudi modal, poi cambia pagina (no window.open)
+  setTimeout(()=>{ window.location.href = url; }, 120);
 }
+
+function askNavigationApp(orderedPts){
+  const modal = el.navModal; 
+  const defaultURL = (()=>{
+    const coords = orderedPts.map(p=>`${p.lat},${p.lng}`).join('|');
+    return `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords)}`;
+  })();
+
+  // Mostra modal
+  modal.classList.remove('hidden');
+
+  // Chiudi + apri app selezionata
+  const choose = (app)=>{
+    modal.classList.add('hidden');
+    openNavigation(app||'google', orderedPts);
+  };
+
+  modal.querySelectorAll('[data-app]').forEach(b=> b.onclick=()=> choose(b.getAttribute('data-app')));
+  document.getElementById('nav-cancel').onclick=()=> choose('google'); // default
+
+  // Fallback: se per qualche motivo non si chiude, dopo 3s chiudi e apri Google
+  setTimeout(()=>{
+    if(!modal.classList.contains('hidden')){
+      modal.classList.add('hidden');
+      setTimeout(()=>{ window.location.href = defaultURL; }, 120);
+    }
+  }, 3000);
+}
+
+el.btnNav.onclick = ()=>{
+  // Usa l'ultimo ordine se disponibile; altrimenti usa l'ordine attuale con punti validi
+  const src = (lastOrderedPts && lastOrderedPts.length)? lastOrderedPts : visite.filter(v=>v.lat && v.lng).map(v=>({lat:v.lat,lng:v.lng}));
+  if(!src.length) return alert('Nessun punto con coordinate valide. Mostra la mappa o importa i PDV.');
+  askNavigationApp(src);
+};
 
 // ===== FAB PDF: screenshot solo mappa + report =====
 el.fabPDF.onclick = async ()=>{
@@ -356,51 +381,39 @@ el.fabPDF.onclick = async ()=>{
   let restoreRoute=false;
   if(layerRoute){ map.removeLayer(layerRoute); restoreRoute=true; }
 
-  // Se la mappa non e' visibile o non ha marker, prova a renderla con i punti correnti
   if(el.mappa.style.display==='none'){
-    await mostraMappa(); // disegna markers e route (poi route e' rimossa sopra)
+    await mostraMappa();
     if(layerRoute){ map.removeLayer(layerRoute); restoreRoute=true; }
   } else {
-    // Aggiorna marker numerati (senza route)
     const src = visite.filter(v=>v.lat && v.lng);
     const pts = src.map(v=>({lat:v.lat,lng:v.lng}));
     const visitedFlags = src.map(v=>!!v.visited);
     addNumberedMarkers(pts, visitedFlags);
   }
 
-  // Aspetta un attimo che i tile si stabilizzino
   await sleep(500);
 
-  // Screenshot mappa
   try{
     const canvas = await html2canvas(el.mappa, {useCORS:true, backgroundColor:null, scale:2});
     const img = canvas.toDataURL('image/png');
-    const pageWidth = 210, margin=10, imgW=pageWidth-2*margin, imgH=imgW*0.6; // proporzioni circa 16:9
+    const pageWidth = 210, margin=10, imgW=pageWidth-2*margin, imgH=imgW*0.6;
     pdf.addImage(img,'PNG', margin, 12, imgW, imgH);
-  }catch(e){
-    pdf.setFontSize(12); pdf.text('Impossibile catturare la mappa. Verifica connessione o riprova.', 10, 20);
-  }
+  }catch(e){ pdf.setFontSize(12); pdf.text('Impossibile catturare la mappa. Verifica connessione o riprova.', 10, 20); }
 
-  // Titolo report
-  let y = 12 + (pageWidth-20)*0.6 + 10; // sotto l'immagine
+  let y = 12 + (pageWidth-20)*0.6 + 10;
   pdf.setFontSize(14); pdf.text('Report Visite Punti Vendita', 10, y); y+=8; pdf.setFontSize(11);
 
-  // Lista PDV con priorita coordinate: gps > geocode > calcolo on-the-fly
   for(const v of visite){
     if(y>270){ pdf.addPage(); y=12; }
     pdf.text(`PDV: ${v.nome||''}`, 10, y); y+=6;
     if(v.address) { pdf.text(`Indirizzo: ${v.address}`, 10, y); y+=6; }
-
     let lat=v.lat, lng=v.lng;
     if(v.src!=='gps' && (!isValidCoord(v))){
-      // Se non c'e' GPS e coordinate non valide, prova geocoding su indirizzo
       if(v.address){ const pos = await geocodeAddress(v.address); if(pos){ lat=pos.lat; lng=pos.lng; } }
     }
-
     if(isFinite(lat) && isFinite(lng)) pdf.text(`Lat: ${Number(lat).toFixed(6)}  Lng: ${Number(lng).toFixed(6)}  (${v.src==='gps'?'GPS':'Auto'})`, 10, y);
     else pdf.text('Coordinate non disponibili', 10, y);
     y+=6;
-
     if(v.note){ pdf.text(`Note: ${v.note}`, 10, y); y+=6; }
     if(v.foto){ try{ pdf.addImage(v.foto, 'JPEG', 10, y, 60, 45); y+=50; }catch(e){ y+=6; } }
     pdf.line(10, y, 200, y); y+=6;
@@ -408,7 +421,6 @@ el.fabPDF.onclick = async ()=>{
 
   pdf.save('visite-pdv.pdf');
 
-  // ripristina route se c'era
   if(restoreRoute){
     const src = visite.filter(v=>v.lat && v.lng).map(v=>({lat:v.lat,lng:v.lng}));
     const route = await routeOSRM(src); layerRoute = L.geoJSON(route.geometry, { style:{ color:'#4cc9f0', weight:5 } }).addTo(map);

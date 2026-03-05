@@ -14,6 +14,7 @@ input, textarea, button{width:100%; margin:6px 0; padding:10px; border-radius:10
 button{background:linear-gradient(180deg,#1b2a41,#0f1a2a); border:1px solid #2f3e56; color:#d7e3ff; font-weight:600}
 button:hover{border-color:var(--accent)}
 button.danger{border-color:#5a1a1a; background:linear-gradient(180deg,#3a0f0f,#1a0b0b); color:#ffdede}
+button.primary{border-color:#2f4bff}
 .status{color:var(--muted); font-size:13px}
 
 .lista{list-style:none; padding:0; margin:0}
