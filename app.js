@@ -7,6 +7,7 @@ function save(){ localStorage.setItem('visite', JSON.stringify(visite)); }
 const sleep = ms => new Promise(r=>setTimeout(r, ms));
 const km = m => (m/1000).toFixed(1);
 const mm = s => Math.round(s/60);
+function isValidCoord(v){ return typeof v?.lat==='number' && typeof v?.lng==='number' && !Number.isNaN(v.lat) && !Number.isNaN(v.lng); }
 
 // ===== Geocoding (Nominatim) =====
 async function geocodeAddress(address){
@@ -72,7 +73,9 @@ const el = {
   btnImport: document.getElementById('btn-importa'),
   btnClear: document.getElementById('btn-clear'),
   btnMappa: document.getElementById('btn-mappa'),
-  btnTSP: document.getElementById('btn-tsp')
+  btnTSP: document.getElementById('btn-tsp'),
+  fabPDF: document.getElementById('fab-pdf'),
+  navModal: document.getElementById('nav-modal')
 };
 
 // ===== Render Lista =====
@@ -142,11 +145,11 @@ function render(){
       ed.querySelector('#e-geocode').onclick=async()=>{
         const a = ed.querySelector('#e-address').value.trim(); if(!a) return alert('Inserisci un indirizzo.');
         const pos = await geocodeAddress(a); if(!pos) return alert('Indirizzo non trovato.');
-        v.lat=pos.lat; v.lng=pos.lng; save(); alert('Coordinate aggiornate.');
+        v.lat=pos.lat; v.lng=pos.lng; v.src='geocode'; save(); alert('Coordinate aggiornate.');
       };
       ed.querySelector('#e-gps').onclick=()=>{
         navigator.geolocation.getCurrentPosition(async gp=>{
-          v.lat=gp.coords.latitude; v.lng=gp.coords.longitude; v.address = await reverseGeocode(v.lat, v.lng) || v.address; save(); render();
+          v.lat=gp.coords.latitude; v.lng=gp.coords.longitude; v.address = await reverseGeocode(v.lat, v.lng) || v.address; v.src='gps'; save(); render();
         }, err=> alert('GPS non disponibile: '+err.message), {enableHighAccuracy:true, timeout:10000});
       };
     }
@@ -170,13 +173,13 @@ el.btnSalva.onclick = async () => {
     const address = el.addr.value.trim();
     if(!nome) return alert('Inserisci il nome.');
 
-    let lat=null, lng=null;
-    if(address){ const pos = await geocodeAddress(address); if(pos){ lat=pos.lat; lng=pos.lng; } }
+    let lat=null, lng=null, src=null;
+    if(address){ const pos = await geocodeAddress(address); if(pos){ lat=pos.lat; lng=pos.lng; src='geocode'; } }
 
     const file = el.foto.files[0];
     const reader = new FileReader();
     reader.onload = (e)=>{
-      visite.push({ nome, address, note: el.note.value, lat, lng, foto: e.target.result||'', visited:false });
+      visite.push({ nome, address, note: el.note.value, lat, lng, src, foto: e.target.result||'', visited:false });
       save(); render();
       el.name.value=''; el.addr.value=''; el.note.value=''; el.foto.value='';
     };
@@ -184,7 +187,7 @@ el.btnSalva.onclick = async () => {
   }catch(err){ alert('Errore salvataggio: '+err.message); }
 };
 
-// GPS per nuova visita
+// GPS per nuova visita (compila indirizzo ma non salva finché non premi Salva)
 el.btnGPS.onclick = ()=>{
   navigator.geolocation.getCurrentPosition(async gp=>{
     const lat=gp.coords.latitude, lng=gp.coords.longitude;
@@ -195,7 +198,6 @@ el.btnGPS.onclick = ()=>{
 
 // ===== Import Excel (robusto) =====
 function pick(obj, keys){
-  // Restituisce il primo valore disponibile per chiave (case/trim tolerant)
   for(const k of keys){
     const found = Object.keys(obj).find(x=>x.trim().toLowerCase()===k.trim().toLowerCase());
     if(found) return obj[found];
@@ -223,10 +225,10 @@ el.btnImport.onclick = ()=>{
       try{
         const pos = await geocodeAddress(address);
         if(pos){
-          visite.push({ nome:`${String(cod).trim()} - ${String(sede).trim()}`, address, lat:pos.lat, lng:pos.lng, note:'', foto:'', visited:false }); ok++; save(); render();
+          visite.push({ nome:`${String(cod).trim()} - ${String(sede).trim()}`, address, lat:pos.lat, lng:pos.lng, src:'geocode', note:'', foto:'', visited:false }); ok++; save(); render();
         } else { ko++; }
       }catch{ ko++; }
-      await sleep(1200); // rispetto politiche Nominatim
+      await sleep(1200);
       el.status.textContent=`Import: ${ok} ok, ${ko} errori`;
     }
     el.status.textContent=`Completato: ${ok} importati, ${ko} non importati`;
@@ -248,23 +250,33 @@ function ensureMap(){
   if(map) return map;
   el.mappa.style.display='block';
   map = L.map('mappa');
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, crossOrigin:true}).addTo(map);
   return map;
+}
+
+function addNumberedMarkers(pts, visitedFlags){
+  // Pulisci marker precedenti
+  map.eachLayer(l=>{ if(l instanceof L.Marker) map.removeLayer(l); });
+  pts.forEach((p,idx)=>{
+    const visited = visitedFlags[idx];
+    const colorClass = visited? 'marker-green' : 'marker-red';
+    const html = `<div class="marker-num ${colorClass}">${idx+1}</div>`;
+    const icon = L.divIcon({className:'', html, iconSize:[28,28], iconAnchor:[14,14]});
+    L.marker([p.lat,p.lng], {icon}).addTo(map).bindPopup(`#${idx+1}`);
+  });
 }
 
 async function mostraMappa(percorsoPunti){
   if(!visite.length) return alert('Nessun punto.');
-  const pts = (percorsoPunti && percorsoPunti.length? percorsoPunti : visite)
-    .filter(v=>v.lat && v.lng)
-    .map(v=>({lat:v.lat, lng:v.lng}));
-  if(!pts.length) return alert('Nessun punto con coordinate valide.');
+  const source = (percorsoPunti && percorsoPunti.length? percorsoPunti : visite)
+    .filter(v=>v.lat && v.lng);
+  if(!source.length) return alert('Nessun punto con coordinate valide.');
+  const pts = source.map(v=>({lat:v.lat, lng:v.lng}));
+  const visitedFlags = source.map(v=>!!v.visited);
   ensureMap();
   const bounds = L.latLngBounds(pts.map(p=>[p.lat,p.lng]));
   map.fitBounds(bounds.pad(0.2));
-  // pulisci marker esistenti
-  map.eachLayer(l=>{ if(l instanceof L.Marker) map.removeLayer(l); });
-  // Marker ordinati
-  pts.forEach((p,idx)=> L.marker([p.lat,p.lng]).addTo(map).bindPopup(`#${idx+1}`));
+  addNumberedMarkers(pts, visitedFlags);
   try{
     const route = await routeOSRM(pts);
     if(layerRoute) map.removeLayer(layerRoute);
@@ -292,9 +304,115 @@ function renderIstruzioni(route){
 el.btnMappa.onclick = ()=> mostraMappa();
 el.btnTSP.onclick = async ()=>{
   if(visite.length<2) return alert('Servono almeno 2 punti');
-  const pts = visite.filter(v=>v.lat && v.lng).map(v=>({lat:v.lat,lng:v.lng}));
+  const src = visite.filter(v=>v.lat && v.lng);
+  const pts = src.map(v=>({lat:v.lat,lng:v.lng}));
   const ordered = tspOrder(pts);
   await mostraMappa(ordered);
+  askNavigationApp(ordered);
+};
+
+// ===== Scelta app navigazione (default Google Maps) =====
+function askNavigationApp(orderedPts){
+  const modal = el.navModal; modal.classList.remove('hidden');
+  const onChoose=(app)=>{
+    modal.classList.add('hidden');
+    openNavigation(app||'google', orderedPts);
+  };
+  modal.querySelectorAll('[data-app]').forEach(b=> b.onclick=()=> onChoose(b.getAttribute('data-app')));
+  document.getElementById('nav-cancel').onclick=()=> onChoose('google'); // default
+}
+
+function openNavigation(app, orderedPts){
+  const coords = orderedPts.map(p=>`${p.lat},${p.lng}`);
+  let url='';
+  switch(app){
+    case 'google':
+      // Google supporta i waypoints (limiti di numero in app). Metto tutte le tappe come waypoints.
+      url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords.join('|'))}`;
+      break;
+    case 'waze':
+      // Waze non supporta multi-waypoint semplice via URL; apro prima tappa.
+      url = `https://waze.com/ul?ll=${coords[0]}&navigate=yes`;
+      break;
+    case 'apple':
+      // Apple Maps: apro destinazione della prima tappa.
+      url = `https://maps.apple.com/?daddr=${coords[0]}&dirflg=d`;
+      break;
+    case 'osm':
+      // OSM può accettare piu' punti.
+      url = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(coords.join(';'))}`;
+      break;
+    default:
+      url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords.join('|'))}`;
+  }
+  window.open(url, '_blank');
+}
+
+// ===== FAB PDF: screenshot solo mappa + report =====
+el.fabPDF.onclick = async ()=>{
+  const { jsPDF } = window.jspdf; const pdf = new jsPDF('p','mm','a4');
+
+  // Assicura mappa pronta e senza polyline nel PDF
+  let restoreRoute=false;
+  if(layerRoute){ map.removeLayer(layerRoute); restoreRoute=true; }
+
+  // Se la mappa non e' visibile o non ha marker, prova a renderla con i punti correnti
+  if(el.mappa.style.display==='none'){
+    await mostraMappa(); // disegna markers e route (poi route e' rimossa sopra)
+    if(layerRoute){ map.removeLayer(layerRoute); restoreRoute=true; }
+  } else {
+    // Aggiorna marker numerati (senza route)
+    const src = visite.filter(v=>v.lat && v.lng);
+    const pts = src.map(v=>({lat:v.lat,lng:v.lng}));
+    const visitedFlags = src.map(v=>!!v.visited);
+    addNumberedMarkers(pts, visitedFlags);
+  }
+
+  // Aspetta un attimo che i tile si stabilizzino
+  await sleep(500);
+
+  // Screenshot mappa
+  try{
+    const canvas = await html2canvas(el.mappa, {useCORS:true, backgroundColor:null, scale:2});
+    const img = canvas.toDataURL('image/png');
+    const pageWidth = 210, margin=10, imgW=pageWidth-2*margin, imgH=imgW*0.6; // proporzioni circa 16:9
+    pdf.addImage(img,'PNG', margin, 12, imgW, imgH);
+  }catch(e){
+    pdf.setFontSize(12); pdf.text('Impossibile catturare la mappa. Verifica connessione o riprova.', 10, 20);
+  }
+
+  // Titolo report
+  let y = 12 + (pageWidth-20)*0.6 + 10; // sotto l'immagine
+  pdf.setFontSize(14); pdf.text('Report Visite Punti Vendita', 10, y); y+=8; pdf.setFontSize(11);
+
+  // Lista PDV con priorita coordinate: gps > geocode > calcolo on-the-fly
+  for(const v of visite){
+    if(y>270){ pdf.addPage(); y=12; }
+    pdf.text(`PDV: ${v.nome||''}`, 10, y); y+=6;
+    if(v.address) { pdf.text(`Indirizzo: ${v.address}`, 10, y); y+=6; }
+
+    let lat=v.lat, lng=v.lng;
+    if(v.src!=='gps' && (!isValidCoord(v))){
+      // Se non c'e' GPS e coordinate non valide, prova geocoding su indirizzo
+      if(v.address){ const pos = await geocodeAddress(v.address); if(pos){ lat=pos.lat; lng=pos.lng; } }
+    }
+
+    if(isFinite(lat) && isFinite(lng)) pdf.text(`Lat: ${Number(lat).toFixed(6)}  Lng: ${Number(lng).toFixed(6)}  (${v.src==='gps'?'GPS':'Auto'})`, 10, y);
+    else pdf.text('Coordinate non disponibili', 10, y);
+    y+=6;
+
+    if(v.note){ pdf.text(`Note: ${v.note}`, 10, y); y+=6; }
+    if(v.foto){ try{ pdf.addImage(v.foto, 'JPEG', 10, y, 60, 45); y+=50; }catch(e){ y+=6; } }
+    pdf.line(10, y, 200, y); y+=6;
+  }
+
+  pdf.save('visite-pdv.pdf');
+
+  // ripristina route se c'era
+  if(restoreRoute){
+    const src = visite.filter(v=>v.lat && v.lng).map(v=>({lat:v.lat,lng:v.lng}));
+    const route = await routeOSRM(src); layerRoute = L.geoJSON(route.geometry, { style:{ color:'#4cc9f0', weight:5 } }).addTo(map);
+  }
 };
 
 // ===== Start =====

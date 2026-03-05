@@ -4,16 +4,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Visite PDV – Free (OSM+OSRM) – Final</title>
+  <title>Visite PDV – Free (OSM+OSRM) – v3</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
   <header>
-    <h1>Visite Punti Vendita - SP</h1>
+    <h1>Visite Punti Vendita – Versione Gratuita</h1>
   </header>
 
   <section class="panel">
@@ -50,7 +51,7 @@
       <button id="btn-mappa">🗺️ Mostra mappa + percorso</button>
       <button id="btn-tsp">🚀 Ottimizza ordine (TSP)</button>
     </div>
-    <div id="mappa" style="height: 360px; display: none"></div>
+    <div id="mappa" style="height: 380px; display: none"></div>
     <h3>Istruzioni turn‑by‑turn</h3>
     <ol id="istruzioni"></ol>
   </section>
@@ -59,6 +60,25 @@
     <h2>Lista punti vendita</h2>
     <ul id="lista" class="lista"></ul>
   </section>
+
+  <!-- Floating PDF FAB -->
+  <button id="fab-pdf" class="fab" title="Esporta PDF">📄</button>
+
+  <!-- Modal scelta navigazione -->
+  <div id="nav-modal" class="modal hidden">
+    <div class="modal-inner">
+      <h3>Scegli l'app di navigazione</h3>
+      <div class="modal-actions">
+        <button data-app="google" class="primary">Google Maps (default)</button>
+        <button data-app="waze">Waze</button>
+        <button data-app="apple">Apple Maps</button>
+        <button data-app="osm">OpenStreetMap</button>
+      </div>
+      <div class="modal-footer">
+        <button id="nav-cancel">Annulla</button>
+      </div>
+    </div>
+  </div>
 
   <footer>
     <small class="muted">OpenStreetMap + OSRM. Dati salvati in locale sul dispositivo.</small>
