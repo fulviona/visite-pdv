@@ -165,6 +165,28 @@ async function mostraMappa(percorsoPunti) {
   }
 }
 function renderIstruzioni(route) {
+
+/* === MINI-SCHEDA RIEPILOGO PERCORSO === */
+function aggiornaRiepilogoPercorso(route) {
+
+    if (!route) {
+        el.routeSummary.style.display = "none";
+        return;
+    }
+
+    const distanzaKm = km(route.distance);
+    const tempoMin = mm(route.duration);
+
+    el.routeSummary.innerHTML = `
+        <div><strong>Distanza totale:</strong> ${distanzaKm} km</div>
+        <div><strong>Tempo stimato:</strong> ${tempoMin} min</div>
+    `;
+
+    el.routeSummary.style.display = "block";
+}
+``
+
+
   function aggiornaRiepilogoPercorso(route) {
     if (!route) {
         el.routeSummary.style.display = "none";
