@@ -12,7 +12,7 @@ function save() { localStorage.setItem('visite', JSON.stringify(visite)); }
 /* Flag per flusso navigazione iPhone-safe */
 let navigationFlowActive = false;
 
-/* Ultimo ordine TSP per Naviga */
+/* Ultimo ordine TSP per Naviga (se serve) */
 let lastOrderedPts = null;
 
 /* -----------------------------
@@ -178,24 +178,19 @@ function addNumberedMarkers(pts, visitedFlags) {
   pts.forEach((p, idx) => {
     const visited = visitedFlags[idx];
 
-    let icon;
-    if (visited) {
-      // icona visitato → cerchio verde ✔️
-      icon = L.divIcon({
-        className: 'marker-visited',
-        html: '✔️',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
-    } else {
-      // icona non visitato → cerchio rosso con numero
-      icon = L.divIcon({
-        className: 'marker-notvisited',
-        html: `${idx + 1}`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
-    }
+    const icon = visited
+      ? L.divIcon({
+          className: 'marker-visited',
+          html: '✔️',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        })
+      : L.divIcon({
+          className: 'marker-notvisited',
+          html: `${idx + 1}`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
 
     L.marker([p.lat, p.lng], { icon })
       .addTo(map)
@@ -208,178 +203,175 @@ function addNumberedMarkers(pts, visitedFlags) {
 ----------------------------- */
 let editingIndex = -1;
 
-
 function render() {
-    el.lista.innerHTML = '';
+  el.lista.innerHTML = '';
 
-    visite.forEach((v, i) => {
-        const li = document.createElement('li');
-        li.className = 'item';
+  visite.forEach((v, i) => {
+    const li = document.createElement('li');
+    li.className = 'item';
 
-        /* ---- RIGA PRINCIPALE ---- */
-        const row = document.createElement('div');
-        row.className = 'row';
+    /* ---- RIGA PRINCIPALE ---- */
+    const row = document.createElement('div');
+    row.className = 'row';
 
-        const info = document.createElement('div');
-        info.innerHTML = `
-            <div class="title">${v.nome || 'Senza nome'}</div>
-            <div class="addr">${v.address || ''}</div>
-        `;
+    const info = document.createElement('div');
+    info.innerHTML = `
+      <div class="title">${v.nome || 'Senza nome'}</div>
+      <div class="addr">${v.address || ''}</div>
+    `;
 
-        const right = document.createElement('div');
-        right.className = 'tags';
+    const right = document.createElement('div');
+    right.className = 'tags';
 
-        const tag = document.createElement('span');
-        tag.className = 'tag' + (v.visited ? ' visited' : '');
-        tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
+    const tag = document.createElement('span');
+    tag.className = 'tag' + (v.visited ? ' visited' : '');
+    tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
 
-        // CLICK SU “VISITATO”
-        tag.onclick = () => {
-            v.visited = !v.visited;
-            save();
-            render();
+    // CLICK SU “VISITATO”
+    tag.onclick = () => {
+      v.visited = !v.visited;
+      save();
+      render();
 
-            // Aggiorna marker se mappa aperta
-            if (map && el.mappa.style.display !== 'none') {
-                const src = visite.filter(v => v.lat && v.lng);
-                const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
-                const visitedFlags = src.map(v => !!v.visited);
-                addNumberedMarkers(pts, visitedFlags);
-            }
-        };
+      // Aggiorna marker se mappa aperta
+      if (map && el.mappa.style.display !== 'none') {
+        const src = visite.filter(v => v.lat && v.lng);
+        const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
+        const visitedFlags = src.map(v => !!v.visited);
+        addNumberedMarkers(pts, visitedFlags);
+      }
+    };
 
-        right.appendChild(tag);
-        row.appendChild(info);
-        row.appendChild(right);
-        li.appendChild(row);
+    right.appendChild(tag);
+    row.appendChild(info);
+    row.appendChild(right);
+    li.appendChild(row);
 
-        /* ─── AZIONI ───────────────────────────── */
-        const actions = document.createElement('div');
-        actions.className = 'actions';
+    /* ─── AZIONI ───────────────────────────── */
+    const actions = document.createElement('div');
+    actions.className = 'actions';
 
-        const bEdit = document.createElement('button');
-        bEdit.textContent = '✏ Modifica';
-        bEdit.onclick = () => { editingIndex = (editingIndex === i ? -1 : i); render(); };
+    const bEdit = document.createElement('button');
+    bEdit.textContent = '✏ Modifica';
+    bEdit.onclick = () => { editingIndex = (editingIndex === i ? -1 : i); render(); };
 
-        const bDel = document.createElement('button');
-        bDel.className = 'danger';
-        bDel.textContent = '❌ Elimina';
-        bDel.onclick = () => onDelete(i);
+    const bDel = document.createElement('button');
+    bDel.className = 'danger';
+    bDel.textContent = '❌ Elimina';
+    bDel.onclick = () => onDelete(i);
 
-        const bRemPhoto = document.createElement('button');
-        bRemPhoto.textContent = '🖼 Rimuovi foto';
-        bRemPhoto.onclick = () => onRemovePhoto(i);
+    const bRemPhoto = document.createElement('button');
+    bRemPhoto.textContent = '🖼 Rimuovi foto';
+    bRemPhoto.onclick = () => onRemovePhoto(i);
 
-        actions.append(bEdit, bRemPhoto, bDel);
-        li.appendChild(actions);
+    actions.append(bEdit, bRemPhoto, bDel);
+    li.appendChild(actions);
 
-        /* ---- FOTO THUMBNAIL ---- */
-        if (v.foto) {
-            const img = document.createElement('img');
-            img.src = v.foto;
-            img.className = 'thumb';
-            img.alt = 'foto';
-            img.onclick = () => window.open(v.foto, '_blank');
-            li.appendChild(img);
+    /* ---- FOTO THUMBNAIL ---- */
+    if (v.foto) {
+      const img = document.createElement('img');
+      img.src = v.foto;
+      img.className = 'thumb';
+      img.alt = 'foto';
+      img.onclick = () => window.open(v.foto, '_blank');
+      li.appendChild(img);
+    }
+
+    /* ---- EDITOR INLINE ---- */
+    if (editingIndex === i) {
+      const ed = document.createElement('div');
+      ed.className = 'editor';
+      ed.innerHTML = `
+        <div class="grid-2">
+          <input id="e-nome" value="${v.nome || ''}"/>
+          <input id="e-address" value="${v.address || ''}"/>
+        </div>
+        <textarea id="e-note">${v.note || ''}</textarea>
+        <div class="btn-row">
+          <button id="e-geocode">🔄 Geocoding indirizzo</button>
+          <button id="e-gps">📍 Usa posizione attuale</button>
+          <input type="file" id="e-foto" accept="image/*" />
+        </div>
+        <div class="btn-row">
+          <button id="e-save">💾 Salva modifiche</button>
+          <button id="e-cancel">↩ Annulla</button>
+        </div>
+      `;
+      li.appendChild(ed);
+
+      // Annulla
+      ed.querySelector('#e-cancel').onclick = () => {
+        editingIndex = -1;
+        render();
+      };
+
+      // Salva
+      ed.querySelector('#e-save').onclick = () => {
+        v.nome = ed.querySelector('#e-nome').value.trim();
+        v.address = ed.querySelector('#e-address').value.trim();
+        v.note = ed.querySelector('#e-note').value;
+
+        const f = ed.querySelector('#e-foto').files[0];
+        if (f) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            v.foto = e.target.result;
+            save(); editingIndex = -1; render();
+          };
+          reader.readAsDataURL(f);
+        } else {
+          save(); editingIndex = -1; render();
         }
+      };
 
-        /* ---- EDITOR INLINE ---- */
-        if (editingIndex === i) {
-            const ed = document.createElement('div');
-            ed.className = 'editor';
-            ed.innerHTML = `
-                <div class="grid-2">
-                    <input id="e-nome" value="${v.nome || ''}"/>
-                    <input id="e-address" value="${v.address || ''}"/>
-                </div>
-                <textarea id="e-note">${v.note || ''}</textarea>
-                <div class="btn-row">
-                    <button id="e-geocode">🔄 Geocoding indirizzo</button>
-                    <button id="e-gps">📍 Usa posizione attuale</button>
-                    <input type="file" id="e-foto" accept="image/*" />
-                </div>
-                <div class="btn-row">
-                    <button id="e-save">💾 Salva modifiche</button>
-                    <button id="e-cancel">↩ Annulla</button>
-                </div>
-            `;
-            li.appendChild(ed);
+      // Geocoding
+      ed.querySelector('#e-geocode').onclick = async () => {
+        const a = ed.querySelector('#e-address').value.trim();
+        if (!a) return alert('Inserisci un indirizzo.');
+        const pos = await geocodeAddress(a);
+        if (!pos) return alert('Indirizzo non trovato.');
+        v.lat = pos.lat; v.lng = pos.lng; v.src = 'geocode';
+        save(); alert('Coordinate aggiornate.');
+      };
 
-            ed.querySelector('#e-cancel').onclick = () => {
-                editingIndex = -1;
-                render();
-            };
+      // GPS
+      ed.querySelector('#e-gps').onclick = () => {
+        navigator.geolocation.getCurrentPosition(async gp => {
+          v.lat = gp.coords.latitude;
+          v.lng = gp.coords.longitude;
+          v.address = await reverseGeocode(v.lat, v.lng) || v.address;
+          v.src = 'gps'; save(); render();
+        }, err => alert('GPS non disponibile: ' + err.message), {
+          enableHighAccuracy: true, timeout: 10000
+        });
+      };
+    }
 
-            ed.querySelector('#e-save').onclick = () => {
-                v.nome = ed.querySelector('#e-nome').value.trim();
-                v.address = ed.querySelector('#e-address').value.trim();
-                v.note = ed.querySelector('#e-note').value;
+    el.lista.appendChild(li);
+  });
 
-                const f = ed.querySelector('#e-foto').files[0];
-                if (f) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        v.foto = e.target.result;
-                        save();
-                        editingIndex = -1;
-                        render();
-                    };
-                    reader.readAsDataURL(f);
-                } else {
-                    save();
-                    editingIndex = -1;
-                    render();
-                }
-            };
+  /* -------------------------------------------------
+     SE NON CI SONO PIÙ PDV → RESET COMPLETO MAPPA
+  -------------------------------------------------- */
+  if (visite.length === 0 && map) {
 
-            ed.querySelector('#e-geocode').onclick = async () => {
-                const a = ed.querySelector('#e-address').value.trim();
-                if (!a) return alert('Inserisci un indirizzo.');
-                const pos = await geocodeAddress(a);
-                if (!pos) return alert('Indirizzo non trovato.');
-                v.lat = pos.lat; v.lng = pos.lng; v.src = 'geocode'; save(); alert('Coordinate aggiornate.');
-            };
+    // 1) Rimuovi polyline OSRM
+    if (layerRoute) {
+      map.removeLayer(layerRoute);
+      layerRoute = null;
+    }
 
-            ed.querySelector('#e-gps').onclick = () => {
-                navigator.geolocation.getCurrentPosition(async gp => {
-                    v.lat = gp.coords.latitude;
-                    v.lng = gp.coords.longitude;
-                    v.address = await reverseGeocode(v.lat, v.lng) || v.address;
-                    v.src = 'gps';
-                    save();
-                    render();
-                }, err => alert('GPS non disponibile: ' + err.message), {
-                    enableHighAccuracy: true,
-                    timeout: 10000
-                });
-            };
-        }
-
-        el.lista.appendChild(li);
+    // 2) Rimuovi TUTTI i marker
+    map.eachLayer(layer => {
+      if (layer instanceof L.Marker) map.removeLayer(layer);
     });
 
-    /* -------------------------------------------------
-       SE NON CI SONO PIÙ PDV → RESET COMPLETO MAPPA
-    -------------------------------------------------- */
-    if (visite.length === 0 && map) {
+    // 3) Nascondi mini-scheda percorso
+    el.routeSummary.style.display = 'none';
 
-        // 1) Rimuovi polyline OSRM
-        if (layerRoute) {
-            map.removeLayer(layerRoute);
-            layerRoute = null;
-        }
-
-        // 2) Rimuovi TUTTI i marker
-        map.eachLayer(layer => {
-            if (layer instanceof L.Marker) map.removeLayer(layer);
-        });
-
-        // 3) Nascondi mini-scheda percorso
-        el.routeSummary.style.display = 'none';
-
-        // 4) Reset vista Italia
-        map.setView([41.8719, 12.5674], 6);
-    }
+    // 4) Reset vista Italia
+    map.setView([41.8719, 12.5674], 6);
+  }
 }
 
 /* Azioni su singolo PDV */
@@ -451,25 +443,47 @@ function importExcel() {
     let ok = 0, ko = 0;
 
     for (const row of data) {
+
       const cod = pick(row, ['Cod_Punto']);
       const reg = pick(row, ['regione_PV', 'regione', 'reg']);
       const sede = pick(row, ['Sede', 'Citta', 'Città']);
       const via = pick(row, ['Indirizzo Sede', 'Indirizzo']);
       const cap = pick(row, ['Cap Sede', 'CAP', 'Cap']);
 
-      if (!cod || !sede || !via) { ko++; el.status.textContent = `Import: ${ok} ok, ${ko} errori`; continue; }
+      if (!cod || !sede || !via) {
+        ko++;
+        el.status.textContent = `Import: ${ok} ok, ${ko} errori`;
+        continue;
+      }
 
-      const address = [via, sede, cap, reg, 'Italia'].filter(Boolean).join(', ');
+      const address = [via, sede, cap, reg, 'Italia']
+        .filter(Boolean)
+        .join(', ');
 
       try {
         const pos = await geocodeAddress(address);
         if (pos) {
-          visite.push({ nome: `${String(cod).trim()} - ${String(sede).trim()}`, address, lat: pos.lat, lng: pos.lng, src: 'geocode', note: '', foto: '', visited: false });
-          ok++; save(); render();
-        } else { ko++; }
-      } catch { ko++; }
+          visite.push({
+            nome: `${String(cod).trim()} - ${String(sede).trim()}`,
+            address,
+            lat: pos.lat,
+            lng: pos.lng,
+            src: 'geocode',
+            note: '',
+            foto: '',
+            visited: false
+          });
+          ok++;
+          save();
+          render();
+        } else {
+          ko++;
+        }
+      } catch {
+        ko++;
+      }
 
-      await sleep(1200); // rispetto limiti Nominatim
+      await sleep(1200);
       el.status.textContent = `Import: ${ok} ok, ${ko} errori`;
     }
 
@@ -483,88 +497,86 @@ function importExcel() {
    Cancella TUTTE le visite
 ----------------------------- */
 function clearAll() {
-    if (!visite.length) return alert('Nessuna visita salvata.');
-    if (!confirm('Attenzione: vuoi eliminare TUTTE le visite?')) return;
-    if (!confirm('Conferma definitiva: questa azione è irreversibile.')) return;
+  if (!visite.length) return alert('Nessuna visita salvata.');
+  if (!confirm('Attenzione: vuoi eliminare TUTTE le visite?')) return;
+  if (!confirm('Conferma definitiva: questa azione è irreversibile.')) return;
 
-    // Svuota lista
-    visite = [];
-    save();
-    render();
-    el.status.textContent = 'Lista svuotata.';
+  visite = [];
+  save();
+  render();
+  el.status.textContent = 'Lista svuotata.';
 
-    // --- RESET COMPLETO MAPPA ---
-    if (map) {
-        // 1) Rimuovi polyline OSRM
-        if (layerRoute) {
-            map.removeLayer(layerRoute);
-            layerRoute = null;
-        }
+  if (map) {
 
-        // 2) Rimuovi TUTTI i marker
-        map.eachLayer(layer => {
-            if (layer instanceof L.Marker) map.removeLayer(layer);
-        });
-
-        // 3) Nascondi mini‑scheda
-        el.routeSummary.style.display = "none";
-
-        // 4) Reset vista Italia
-        map.setView([41.8719, 12.5674], 6);
+    if (layerRoute) {
+      map.removeLayer(layerRoute);
+      layerRoute = null;
     }
+
+    map.eachLayer(layer => {
+      if (layer instanceof L.Marker) map.removeLayer(layer);
+    });
+
+    el.routeSummary.style.display = 'none';
+
+    map.setView([41.8719, 12.5674], 6);
+  }
 }
+
+/* -----------------------------
+   Rimuove SOLO PDV importati (src="geocode")
+----------------------------- */
 function clearImportedPoints() {
-    // Chiede conferma all'utente
-    const msg = [
-        '⚠️ Operazione non reversibile.',
-        'Verranno rimossi SOLO i punti importati da Excel (src="geocode").',
-        'I punti inseriti manualmente resteranno.',
-        '',
-        'Procedere?'
-    ].join('\n');
 
-    if (!confirm(msg)) return;
+  const msg = [
+    '⚠️ Operazione non reversibile.',
+    'Verranno rimossi SOLO i punti importati da Excel (src="geocode").',
+    'I punti inseriti manualmente resteranno.',
+    '',
+    'Procedere?'
+  ].join('\n');
 
-    const before = visite.length;
+  if (!confirm(msg)) return;
 
-    // Teniamo solo i PDV NON importati
-    visite = visite.filter(v => v.src !== 'geocode');
+  const before = visite.length;
 
-    const removed = before - visite.length;
+  visite = visite.filter(v => v.src !== 'geocode');
 
-    // Salva + aggiorna lista
-    save();
-    render();
+  const removed = before - visite.length;
 
-    // Se la mappa è visibile, aggiorna subito i marker
-    if (map && el.mappa && el.mappa.style.display !== 'none') {
-        const srcPts = visite.filter(v => v.lat && v.lng);
-        const pts = srcPts.map(v => ({ lat: v.lat, lng: v.lng }));
-        const visitedFlags = srcPts.map(v => !!v.visited);
-        addNumberedMarkers(pts, visitedFlags);
+  save();
+  render();
+
+  if (map && el.mappa.style.display !== 'none') {
+    const srcPts = visite.filter(v => v.lat && v.lng);
+    const pts = srcPts.map(v => ({ lat: v.lat, lng: v.lng }));
+    const visitedFlags = srcPts.map(v => !!v.visited);
+    addNumberedMarkers(pts, visitedFlags);
+  }
+
+  if (map && visite.length === 0) {
+
+    if (layerRoute) {
+      map.removeLayer(layerRoute);
+      layerRoute = null;
     }
 
-    // Se dopo la cancellazione non resta nulla → reset completo mappa
-    if (map && visite.length === 0) {
-        // 1) Rimuovi polyline OSRM
-        if (layerRoute) {
-            map.removeLayer(layerRoute);
-            layerRoute = null;
-        }
-        // 2) Rimuovi tutti i marker
-        map.eachLayer(layer => {
-            if (layer instanceof L.Marker) map.removeLayer(layer);
-        });
-        // 3) Nascondi mini‑scheda
-        if (el.routeSummary) el.routeSummary.style.display = 'none';
-        // 4) Reset vista Italia
-        map.setView([41.8719, 12.5674], 6);
-    }
+    map.eachLayer(layer => {
+      if (layer instanceof L.Marker) map.removeLayer(layer);
+    });
 
-    alert(removed > 0
-        ? `Rimossi ${removed} punti importati da Excel.`
-        : 'Nessun punto importato da Excel da rimuovere.');
+    if (el.routeSummary) el.routeSummary.style.display = 'none';
+
+    map.setView([41.8719, 12.5674], 6);
+  }
+
+  alert(
+    removed > 0
+      ? `Rimossi ${removed} punti importati da Excel.`
+      : 'Nessun punto importato da Excel da rimuovere.'
+  );
 }
+
 /* -----------------------------
    MINI-SCHEDA riepilogo percorso
 ----------------------------- */
@@ -574,17 +586,13 @@ function aggiornaRiepilogoPercorso(route) {
     return;
   }
 
-  // distanza in km (1 decimale)
   const distanzaKm = km(route.distance);
 
-  // tempo in ore + minuti (es. "1 h 12 min")
-  const totalSec = Math.round(route.duration); // sec
+  const totalSec = Math.round(route.duration);
   const ore = Math.floor(totalSec / 3600);
   const min = Math.round((totalSec % 3600) / 60);
 
-  const oreStr = `${ore} h`;
-  const minStr = `${min} min`;
-  const tempoFormattato = `${oreStr} ${minStr}`;
+  const tempoFormattato = `${ore} h ${min} min`;
 
   el.routeSummary.innerHTML = `
     <div><strong>Distanza totale:</strong> ${distanzaKm} km</div>
@@ -624,7 +632,6 @@ async function mostraMappa(percorsoPunti) {
       style: { color: '#4cc9f0', weight: 5 }
     }).addTo(map);
 
-    // Mini-scheda percorso
     aggiornaRiepilogoPercorso(route);
 
   } catch (err) {
@@ -639,16 +646,21 @@ function buildDeepLink(app, coord) {
   const latlng = `${coord.lat},${coord.lng}`;
 
   switch (app) {
-    case 'google': return `comgooglemaps://?daddr=${latlng}&directionsmode=driving`;
-    case 'waze'  : return `waze://?ll=${latlng}&navigate=yes`;
-    case 'apple' : return `maps://?daddr=${latlng}&dirflg=d`;
-    case 'osm'   : return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(latlng)}`;
-    default      : return `comgooglemaps://?daddr=${latlng}&directionsmode=driving`;
+    case 'google':
+      return `comgooglemaps://?daddr=${latlng}&directionsmode=driving`;
+    case 'waze':
+      return `waze://?ll=${latlng}&navigate=yes`;
+    case 'apple':
+      return `maps://?daddr=${latlng}&dirflg=d`;
+    case 'osm':
+      return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(latlng)}`;
+    default:
+      return `comgooglemaps://?daddr=${latlng}&directionsmode=driving`;
   }
 }
 
 function askNavigationApp(orderedPts) {
-  if (!navigationFlowActive) return; // iPhone-safe
+  if (!navigationFlowActive) return;
 
   const modal = el.navModal;
 
@@ -701,12 +713,17 @@ async function exportPDF() {
 
   let restoreRoute = false;
 
-  // Rimuove polyline per evitare distorsioni nello screenshot
-  if (layerRoute) { map.removeLayer(layerRoute); restoreRoute = true; }
+  if (layerRoute) {
+    map.removeLayer(layerRoute);
+    restoreRoute = true;
+  }
 
   if (el.mappa.style.display === 'none') {
     await mostraMappa();
-    if (layerRoute) { map.removeLayer(layerRoute); restoreRoute = true; }
+    if (layerRoute) {
+      map.removeLayer(layerRoute);
+      restoreRoute = true;
+    }
   } else {
     const src = visite.filter(v => v.lat && v.lng);
     const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
@@ -717,18 +734,26 @@ async function exportPDF() {
   await sleep(500);
 
   try {
-    const canvas = await html2canvas(el.mappa, { useCORS: true, backgroundColor: null, scale: 2 });
+    const canvas = await html2canvas(el.mappa, {
+      useCORS: true,
+      backgroundColor: null,
+      scale: 2
+    });
     const img = canvas.toDataURL('image/png');
-    const pageWidth = 210, margin = 10, imgW = pageWidth - 2 * margin, imgH = imgW * 0.6;
+    const pageWidth = 210, margin = 10;
+    const imgW = pageWidth - 2 * margin;
+    const imgH = imgW * 0.6;
     pdf.addImage(img, 'PNG', margin, 12, imgW, imgH);
   } catch (e) {
     pdf.setFontSize(12);
     pdf.text('Impossibile catturare la mappa. Verifica connessione o riprova.', 10, 20);
   }
 
-  // Titolo + righe per PDV
-  let y = 12 + (210 - 20) * 0.6 + 10;
-  pdf.setFontSize(14); pdf.text('Report Visite Punti Vendita', 10, y); y += 8; pdf.setFontSize(11);
+  let y = 12 + ((210 - 20) * 0.6) + 10;
+  pdf.setFontSize(14);
+  pdf.text('Report Visite Punti Vendita', 10, y);
+  y += 8;
+  pdf.setFontSize(11);
 
   for (const v of visite) {
     if (y > 270) { pdf.addPage(); y = 12; }
@@ -737,25 +762,43 @@ async function exportPDF() {
     if (v.address) { pdf.text(`Indirizzo: ${v.address}`, 10, y); y += 6; }
 
     let lat = v.lat, lng = v.lng;
+
     if (v.src !== 'gps' && (!isValidCoord(v))) {
-      if (v.address) { const pos = await geocodeAddress(v.address); if (pos) { lat = pos.lat; lng = pos.lng; } }
+      if (v.address) {
+        const pos = await geocodeAddress(v.address);
+        if (pos) { lat = pos.lat; lng = pos.lng; }
+      }
     }
-    if (isFinite(lat) && isFinite(lng)) pdf.text(`Lat: ${Number(lat).toFixed(6)}  Lng: ${Number(lng).toFixed(6)}  (${v.src === 'gps' ? 'GPS' : 'Auto'})`, 10, y);
-    else pdf.text('Coordinate non disponibili', 10, y);
+
+    if (isFinite(lat) && isFinite(lng)) {
+      pdf.text(`Lat: ${lat.toFixed(6)}  Lng: ${lng.toFixed(6)}  (${v.src === 'gps' ? 'GPS' : 'Auto'})`, 10, y);
+    } else {
+      pdf.text('Coordinate non disponibili', 10, y);
+    }
     y += 6;
 
     if (v.note) { pdf.text(`Note: ${v.note}`, 10, y); y += 6; }
-    if (v.foto) { try { pdf.addImage(v.foto, 'JPEG', 10, y, 60, 45); y += 50; } catch (e) { y += 6; } }
-    pdf.line(10, y, 200, y); y += 6;
+
+    if (v.foto) {
+      try {
+        pdf.addImage(v.foto, 'JPEG', 10, y, 60, 45);
+        y += 50;
+      } catch {}
+    }
+
+    pdf.line(10, y, 200, y);
+    y += 6;
   }
 
   pdf.save('visite-pdv.pdf');
 
-  // Ripristina percorso
   if (restoreRoute) {
-    const src = visite.filter(v => v.lat && v.lng).map(v => ({ lat: v.lat, lng: v.lng }));
+    const src = visite.filter(v => v.lat && v.lng)
+                      .map(v => ({ lat: v.lat, lng: v.lng }));
     const route = await routeOSRM(src);
-    layerRoute = L.geoJSON(route.geometry, { style: { color: '#4cc9f0', weight: 5 } }).addTo(map);
+    layerRoute = L.geoJSON(route.geometry, {
+      style: { color: '#4cc9f0', weight: 5 }
+    }).addTo(map);
   }
 }
 
@@ -763,18 +806,14 @@ async function exportPDF() {
    Init (DOMContentLoaded) + Eventi
 ----------------------------- */
 document.addEventListener('DOMContentLoaded', () => {
-       
-// BINDING A PROVA DI ERRORE
-setTimeout(() => {
-  const btn = document.getElementById('btn-clear-import');
-  if (btn) {
-    btn.onclick = clearImportedPoints;
-    console.log("btn-clear-import AGGANCIATO correttamente");
-  } else {
-    console.warn("btn-clear-import NON trovato nel DOM");
-  }
-}, 100);
 
+  // Binding a prova di errore per il bottone rimuovi-importati
+  setTimeout(() => {
+    const btn = document.getElementById('btn-clear-import');
+    if (btn) {
+      btn.onclick = clearImportedPoints;
+    }
+  }, 100);
 
   el = {
     name: document.getElementById('pdv-name'),
@@ -785,7 +824,7 @@ setTimeout(() => {
     status: document.getElementById('import-status'),
     lista: document.getElementById('lista'),
     mappa: document.getElementById('mappa'),
-    istr: document.getElementById('istruzioni'),     // (nascoste via CSS)
+    istr: document.getElementById('istruzioni'),
     routeSummary: document.getElementById('route-summary'),
     btnGPS: document.getElementById('btn-gps'),
     btnSalva: document.getElementById('btn-salva'),
@@ -801,7 +840,6 @@ setTimeout(() => {
     goBtn: document.getElementById('go-btn'),
     goCancel: document.getElementById('go-cancel'),
     loading: document.getElementById('loading-screen')
-
   };
 
   // Eventi
@@ -809,38 +847,38 @@ setTimeout(() => {
   el.btnGPS.onclick = fillFromGPS;
   el.btnImport.onclick = importExcel;
   el.btnClear.onclick = clearAll;
-  // NUOVO: rimuovi solo i PDV importati
+
   el.btnClearImport = document.getElementById('btn-clear-import');
   el.btnClearImport.onclick = clearImportedPoints;
 
-
   el.btnMappa.onclick = () => mostraMappa();
 
-el.btnTSP.onclick = async () => {
+  el.btnTSP.onclick = async () => {
     if (visite.length < 2) return alert('Servono almeno 2 punti');
 
     const validi = visite.filter(v => v.lat && v.lng);
     const pts = validi.map(v => ({ lat: v.lat, lng: v.lng }));
     const ordered = tspOrder(pts);
 
-    // --- RIORDINA l’array visite secondo il percorso ottimizzato ---
+    // Riordina visite secondo il percorso TSP
     visite = ordered.map(o =>
-        visite.find(v =>
-            v.lat === o.lat &&
-            v.lng === o.lng &&
-            v.nome === o.nome   // controllo extra importantissimo
-        )
+      visite.find(v =>
+        v.lat === o.lat &&
+        v.lng === o.lng &&
+        v.nome === o.nome
+      )
     );
 
     save();
     render();
     await mostraMappa(visite);
-};
+  };
 
   el.btnNav.onclick = () => {
     const src = (lastOrderedPts && lastOrderedPts.length)
       ? lastOrderedPts
-      : visite.filter(v => v.lat && v.lng).map(v => ({ lat: v.lat, lng: v.lng }));
+      : visite.filter(v => v.lat && v.lng)
+              .map(v => ({ lat: v.lat, lng: v.lng }));
 
     if (!src.length) return alert('Nessun punto con coordinate valide.');
 
@@ -850,12 +888,11 @@ el.btnTSP.onclick = async () => {
 
   el.fabPDF.onclick = exportPDF;
 
-  // Render iniziale
   render();
 });
 
 /* -----------------------------
-   Loading Screen (dissolvenza)
+   Loading Screen
 ----------------------------- */
 window.addEventListener('load', () => {
   const scr = document.getElementById('loading-screen');
