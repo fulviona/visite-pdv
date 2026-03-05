@@ -170,15 +170,32 @@ function ensureMap() {
 }
 
 function addNumberedMarkers(pts, visitedFlags) {
-  map.eachLayer(l => {
-    if (l instanceof L.Marker) map.removeLayer(l);
+  // Rimuove i marker precedenti
+  map.eachLayer(layer => {
+    if (layer instanceof L.Marker) map.removeLayer(layer);
   });
 
   pts.forEach((p, idx) => {
     const visited = visitedFlags[idx];
-    const colorClass = visited ? 'marker-green' : 'marker-red';
-    const html = `<div class="marker-num ${colorClass}">${idx + 1}</div>`;
-    const icon = L.divIcon({ className: '', html, iconSize: [28, 28], iconAnchor: [14, 14] });
+
+    let icon;
+    if (visited) {
+      // icona visitato → cerchio verde ✔️
+      icon = L.divIcon({
+        className: 'marker-visited',
+        html: '✔️',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+    } else {
+      // icona non visitato → cerchio rosso con numero
+      icon = L.divIcon({
+        className: 'marker-notvisited',
+        html: `${idx + 1}`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+    }
 
     L.marker([p.lat, p.lng], { icon })
       .addTo(map)
