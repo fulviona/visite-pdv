@@ -76,7 +76,10 @@ const el = {
   btnTSP: document.getElementById('btn-tsp'),
   btnNav: document.getElementById('btn-nav'),
   fabPDF: document.getElementById('fab-pdf'),
-  navModal: document.getElementById('nav-modal')
+  navModal: document.getElementById('nav-modal'),
+  goOverlay: document.getElementById('go-overlay'),
+  goBtn: document.getElementById('go-btn'),
+  goCancel: document.getElementById('go-cancel')
 };
 
 // ===== Render Lista =====
@@ -86,7 +89,6 @@ function render(){
   visite.forEach((v,i)=>{
     const li = document.createElement('li'); li.className='item';
 
-    // Riga principale
     const row = document.createElement('div'); row.className='row';
     const info = document.createElement('div');
     info.innerHTML = `<div class="title">${v.nome||'Senza nome'}</div><div class="addr">${v.address||''}</div>`;
@@ -99,7 +101,6 @@ function render(){
     row.appendChild(info); row.appendChild(right);
     li.appendChild(row);
 
-    // Azioni
     const actions = document.createElement('div'); actions.className='actions';
     const bEdit = document.createElement('button'); bEdit.textContent='✏ Modifica'; bEdit.onclick=()=>{ editingIndex=(editingIndex===i?-1:i); render(); };
     const bDel = document.createElement('button'); bDel.className='danger'; bDel.textContent='❌ Elimina'; bDel.onclick=()=>onDelete(i);
@@ -107,14 +108,12 @@ function render(){
     actions.append(bEdit, bRemPhoto, bDel);
     li.appendChild(actions);
 
-    // Thumbnail se presente
     if(v.foto){
       const img = document.createElement('img'); img.src=v.foto; img.className='thumb'; img.alt='foto';
       img.onclick=()=>window.open(v.foto,'_blank');
       li.appendChild(img);
     }
 
-    // Editor inline
     if(editingIndex===i){
       const ed = document.createElement('div'); ed.className='editor';
       ed.innerHTML = `
@@ -159,13 +158,8 @@ function render(){
   });
 }
 
-function onDelete(i){
-  if(!confirm('Eliminare questa visita?')) return; visite.splice(i,1); save(); render();
-}
-function onRemovePhoto(i){
-  if(!visite[i].foto) return alert('Nessuna foto da rimuovere.');
-  if(!confirm('Rimuovere la foto?')) return; visite[i].foto=''; save(); render();
-}
+function onDelete(i){ if(!confirm('Eliminare questa visita?')) return; visite.splice(i,1); save(); render(); }
+function onRemovePhoto(i){ if(!visite[i].foto) return alert('Nessuna foto da rimuovere.'); if(!confirm('Rimuovere la foto?')) return; visite[i].foto=''; save(); render(); }
 
 // ===== Nuova visita =====
 el.btnSalva.onclick = async () => {
@@ -198,13 +192,7 @@ el.btnGPS.onclick = ()=>{
 };
 
 // ===== Import Excel (robusto) =====
-function pick(obj, keys){
-  for(const k of keys){
-    const found = Object.keys(obj).find(x=>x.trim().toLowerCase()===k.trim().toLowerCase());
-    if(found) return obj[found];
-  }
-  return undefined;
-}
+function pick(obj, keys){ for(const k of keys){ const found = Object.keys(obj).find(x=>x.trim().toLowerCase()===k.trim().toLowerCase()); if(found) return obj[found]; } return undefined; }
 
 el.btnImport.onclick = ()=>{
   const file = el.excel.files[0]; if(!file) return alert('Seleziona un file .xlsx');
@@ -225,9 +213,8 @@ el.btnImport.onclick = ()=>{
       const address = [via, sede, cap, reg, 'Italia'].filter(Boolean).join(', ');
       try{
         const pos = await geocodeAddress(address);
-        if(pos){
-          visite.push({ nome:`${String(cod).trim()} - ${String(sede).trim()}`, address, lat:pos.lat, lng:pos.lng, src:'geocode', note:'', foto:'', visited:false }); ok++; save(); render();
-        } else { ko++; }
+        if(pos){ visite.push({ nome:`${String(cod).trim()} - ${String(sede).trim()}`, address, lat:pos.lat, lng:pos.lng, src:'geocode', note:'', foto:'', visited:false }); ok++; save(); render(); }
+        else { ko++; }
       }catch{ ko++; }
       await sleep(1200);
       el.status.textContent=`Import: ${ok} ok, ${ko} errori`;
@@ -238,194 +225,30 @@ el.btnImport.onclick = ()=>{
 };
 
 // ===== Cancella tutte =====
-el.btnClear.onclick = ()=>{
-  if(!visite.length) return alert('Nessuna visita salvata.');
-  if(!confirm('Attenzione: vuoi eliminare TUTTE le visite?')) return;
-  if(!confirm('Conferma definitiva: questa azione è irreversibile.')) return;
-  visite = []; save(); render(); el.status.textContent='Lista svuotata.';
-};
+el.btnClear.onclick = ()=>{ if(!visite.length) return alert('Nessuna visita salvata.'); if(!confirm('Attenzione: vuoi eliminare TUTTE le visite?')) return; if(!confirm('Conferma definitiva: questa azione è irreversibile.')) return; visite = []; save(); render(); el.status.textContent='Lista svuotata.'; };
 
 // ===== Mappa & Routing =====
-let map, layerRoute;
-let lastOrderedPts = null; // memorizza ultimo ordinamento per Naviga
-
-function ensureMap(){
-  if(map) return map;
-  el.mappa.style.display='block';
-  map = L.map('mappa');
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, crossOrigin:true}).addTo(map);
-  return map;
-}
-
-function addNumberedMarkers(pts, visitedFlags){
-  // Pulisci marker precedenti
-  map.eachLayer(l=>{ if(l instanceof L.Marker) map.removeLayer(l); });
-  pts.forEach((p,idx)=>{
-    const visited = visitedFlags[idx];
-    const colorClass = visited? 'marker-green' : 'marker-red';
-    const html = `<div class="marker-num ${colorClass}">${idx+1}</div>`;
-    const icon = L.divIcon({className:'', html, iconSize:[28,28], iconAnchor:[14,14]});
-    L.marker([p.lat,p.lng], {icon}).addTo(map).bindPopup(`#${idx+1}`);
-  });
-}
-
-async function mostraMappa(percorsoPunti){
-  if(!visite.length) return alert('Nessun punto.');
-  const source = (percorsoPunti && percorsoPunti.length? percorsoPunti : visite)
-    .filter(v=>v.lat && v.lng);
-  if(!source.length) return alert('Nessun punto con coordinate valide.');
-  const pts = source.map(v=>({lat:v.lat, lng:v.lng}));
-  const visitedFlags = source.map(v=>!!v.visited);
-  ensureMap();
-  const bounds = L.latLngBounds(pts.map(p=>[p.lat,p.lng]));
-  map.fitBounds(bounds.pad(0.2));
-  addNumberedMarkers(pts, visitedFlags);
-  try{
-    const route = await routeOSRM(pts);
-    if(layerRoute) map.removeLayer(layerRoute);
-    layerRoute = L.geoJSON(route.geometry, { style:{ color:'#4cc9f0', weight:5 } }).addTo(map);
-    renderIstruzioni(route);
-  }catch(err){ alert('Routing non disponibile: '+err.message); }
-}
-function renderIstruzioni(route){
-  el.istr.innerHTML='';
-  let stepCount=1;
-  route.legs.forEach((leg)=>{
-    leg.steps.forEach(step=>{
-      const liEl=document.createElement('li');
-      const name = step.name && step.name!=='-'? step.name : 'strada senza nome';
-      const mod = step.maneuver && step.maneuver.modifier? step.maneuver.modifier : '';
-      liEl.textContent = `${stepCount}. ${mod?mod+': ':''}prosegui su ${name} per ${km(step.distance)} km`;
-      el.istr.appendChild(liEl); stepCount++;
-    });
-  });
-  const liSum=document.createElement('li');
-  liSum.innerHTML = `<strong>Totale:</strong> ${km(route.distance)} km, ${mm(route.duration)} min`;
-  el.istr.appendChild(liSum);
-}
+let map, layerRoute; let lastOrderedPts = null;
+function ensureMap(){ if(map) return map; el.mappa.style.display='block'; map = L.map('mappa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, crossOrigin:true}).addTo(map); return map; }
+function addNumberedMarkers(pts, visitedFlags){ map.eachLayer(l=>{ if(l instanceof L.Marker) map.removeLayer(l); }); pts.forEach((p,idx)=>{ const visited = visitedFlags[idx]; const colorClass = visited? 'marker-green' : 'marker-red'; const html = `<div class="marker-num ${colorClass}">${idx+1}</div>`; const icon = L.divIcon({className:'', html, iconSize:[28,28], iconAnchor:[14,14]}); L.marker([p.lat,p.lng], {icon}).addTo(map).bindPopup(`#${idx+1}`); }); }
+async function mostraMappa(percorsoPunti){ if(!visite.length) return alert('Nessun punto.'); const source = (percorsoPunti && percorsoPunti.length? percorsoPunti : visite).filter(v=>v.lat && v.lng); if(!source.length) return alert('Nessun punto con coordinate valide.'); const pts = source.map(v=>({lat:v.lat, lng:v.lng})); const visitedFlags = source.map(v=>!!v.visited); ensureMap(); const bounds = L.latLngBounds(pts.map(p=>[p.lat,p.lng])); map.fitBounds(bounds.pad(0.2)); addNumberedMarkers(pts, visitedFlags); try{ const route = await routeOSRM(pts); if(layerRoute) map.removeLayer(layerRoute); layerRoute = L.geoJSON(route.geometry, { style:{ color:'#4cc9f0', weight:5 } }).addTo(map); renderIstruzioni(route); }catch(err){ alert('Routing non disponibile: '+err.message); } }
+function renderIstruzioni(route){ el.istr.innerHTML=''; let stepCount=1; route.legs.forEach((leg)=>{ leg.steps.forEach(step=>{ const liEl=document.createElement('li'); const name = step.name && step.name!=='-'? step.name : 'strada senza nome'; const mod = step.maneuver && step.maneuver.modifier? step.maneuver.modifier : ''; liEl.textContent = `${stepCount}. ${mod?mod+': ':''}prosegui su ${name} per ${km(step.distance)} km`; el.istr.appendChild(liEl); stepCount++; }); }); const liSum=document.createElement('li'); liSum.innerHTML = `<strong>Totale:</strong> ${km(route.distance)} km, ${mm(route.duration)} min`; el.istr.appendChild(liSum); }
 
 el.btnMappa.onclick = ()=> mostraMappa();
-el.btnTSP.onclick = async ()=>{
-  if(visite.length<2) return alert('Servono almeno 2 punti');
-  const src = visite.filter(v=>v.lat && v.lng);
-  const pts = src.map(v=>({lat:v.lat,lng:v.lng}));
-  lastOrderedPts = tspOrder(pts);
-  await mostraMappa(lastOrderedPts);
-  // NESSUN popup qui: si userà il bottone "Naviga"
-};
+el.btnTSP.onclick = async ()=>{ if(visite.length<2) return alert('Servono almeno 2 punti'); const src = visite.filter(v=>v.lat && v.lng); const pts = src.map(v=>({lat:v.lat,lng:v.lng})); lastOrderedPts = tspOrder(pts); await mostraMappa(lastOrderedPts); };
 
-// ===== Scelta app navigazione (default Google Maps) =====
-function openNavigation(app, orderedPts){
-  const coords = orderedPts.map(p=>`${p.lat},${p.lng}`);
-  let url='';
-  switch(app){
-    case 'google':
-      url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords.join('|'))}`;
-      break;
-    case 'waze':
-      url = `https://waze.com/ul?ll=${coords[0]}&navigate=yes`;
-      break;
-    case 'apple':
-      url = `https://maps.apple.com/?daddr=${coords[0]}&dirflg=d`;
-      break;
-    case 'osm':
-      url = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(coords.join(';'))}`;
-      break;
-    default:
-      url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords.join('|'))}`;
-  }
-  // iPhone-safe: chiudi modal, poi cambia pagina (no window.open)
-  setTimeout(()=>{ window.location.href = url; }, 120);
-}
+// ===== Flusso Navigazione iPhone-safe con overlay "AVVIA NAVIGAZIONE" =====
+function buildURL(app, orderedPts){ const coords = orderedPts.map(p=>`${p.lat},${p.lng}`); switch(app){ case 'google': return `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords.join('|'))}`; case 'waze': return `https://waze.com/ul?ll=${coords[0]}&navigate=yes`; case 'apple': return `https://maps.apple.com/?daddr=${coords[0]}&dirflg=d`; case 'osm': return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(coords.join(';'))}`; default: return `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords.join('|'))}`; } }
+function askNavigationApp(orderedPts){ const modal = el.navModal; modal.classList.remove('hidden'); const choose = (app)=>{ modal.classList.add('hidden'); // invece di aprire subito, mostra overlay centrale (azione diretta utente)
+  const url = buildURL(app||'google', orderedPts); showGoOverlay(url); }; modal.querySelectorAll('[data-app]').forEach(b=> b.onclick=()=> choose(b.getAttribute('data-app'))); document.getElementById('nav-cancel').onclick=()=> choose('google'); setTimeout(()=>{ if(!modal.classList.contains('hidden')){ modal.classList.add('hidden'); showGoOverlay(buildURL('google', orderedPts)); } }, 3000); }
+function showGoOverlay(url){ el.goOverlay.classList.remove('hidden'); // l'azione successiva e' un tap diretto dell'utente -> iOS la consente
+  const go = ()=>{ el.goOverlay.classList.add('hidden'); setTimeout(()=>{ window.location.href = url; }, 50); };
+  el.goBtn.onclick = go; el.goCancel.onclick = ()=> el.goOverlay.classList.add('hidden'); }
 
-function askNavigationApp(orderedPts){
-  const modal = el.navModal; 
-  const defaultURL = (()=>{
-    const coords = orderedPts.map(p=>`${p.lat},${p.lng}`).join('|');
-    return `https://www.google.com/maps/dir/?api=1&travelmode=driving&waypoints=${encodeURIComponent(coords)}`;
-  })();
-
-  // Mostra modal
-  modal.classList.remove('hidden');
-
-  // Chiudi + apri app selezionata
-  const choose = (app)=>{
-    modal.classList.add('hidden');
-    openNavigation(app||'google', orderedPts);
-  };
-
-  modal.querySelectorAll('[data-app]').forEach(b=> b.onclick=()=> choose(b.getAttribute('data-app')));
-  document.getElementById('nav-cancel').onclick=()=> choose('google'); // default
-
-  // Fallback: se per qualche motivo non si chiude, dopo 3s chiudi e apri Google
-  setTimeout(()=>{
-    if(!modal.classList.contains('hidden')){
-      modal.classList.add('hidden');
-      setTimeout(()=>{ window.location.href = defaultURL; }, 120);
-    }
-  }, 3000);
-}
-
-el.btnNav.onclick = ()=>{
-  // Usa l'ultimo ordine se disponibile; altrimenti usa l'ordine attuale con punti validi
-  const src = (lastOrderedPts && lastOrderedPts.length)? lastOrderedPts : visite.filter(v=>v.lat && v.lng).map(v=>({lat:v.lat,lng:v.lng}));
-  if(!src.length) return alert('Nessun punto con coordinate valide. Mostra la mappa o importa i PDV.');
-  askNavigationApp(src);
-};
+el.btnNav.onclick = ()=>{ const src = (lastOrderedPts && lastOrderedPts.length)? lastOrderedPts : visite.filter(v=>v.lat && v.lng).map(v=>({lat:v.lat,lng:v.lng})); if(!src.length) return alert('Nessun punto con coordinate valide. Mostra la mappa o importa i PDV.'); askNavigationApp(src); };
 
 // ===== FAB PDF: screenshot solo mappa + report =====
-el.fabPDF.onclick = async ()=>{
-  const { jsPDF } = window.jspdf; const pdf = new jsPDF('p','mm','a4');
-
-  // Assicura mappa pronta e senza polyline nel PDF
-  let restoreRoute=false;
-  if(layerRoute){ map.removeLayer(layerRoute); restoreRoute=true; }
-
-  if(el.mappa.style.display==='none'){
-    await mostraMappa();
-    if(layerRoute){ map.removeLayer(layerRoute); restoreRoute=true; }
-  } else {
-    const src = visite.filter(v=>v.lat && v.lng);
-    const pts = src.map(v=>({lat:v.lat,lng:v.lng}));
-    const visitedFlags = src.map(v=>!!v.visited);
-    addNumberedMarkers(pts, visitedFlags);
-  }
-
-  await sleep(500);
-
-  try{
-    const canvas = await html2canvas(el.mappa, {useCORS:true, backgroundColor:null, scale:2});
-    const img = canvas.toDataURL('image/png');
-    const pageWidth = 210, margin=10, imgW=pageWidth-2*margin, imgH=imgW*0.6;
-    pdf.addImage(img,'PNG', margin, 12, imgW, imgH);
-  }catch(e){ pdf.setFontSize(12); pdf.text('Impossibile catturare la mappa. Verifica connessione o riprova.', 10, 20); }
-
-  let y = 12 + (pageWidth-20)*0.6 + 10;
-  pdf.setFontSize(14); pdf.text('Report Visite Punti Vendita', 10, y); y+=8; pdf.setFontSize(11);
-
-  for(const v of visite){
-    if(y>270){ pdf.addPage(); y=12; }
-    pdf.text(`PDV: ${v.nome||''}`, 10, y); y+=6;
-    if(v.address) { pdf.text(`Indirizzo: ${v.address}`, 10, y); y+=6; }
-    let lat=v.lat, lng=v.lng;
-    if(v.src!=='gps' && (!isValidCoord(v))){
-      if(v.address){ const pos = await geocodeAddress(v.address); if(pos){ lat=pos.lat; lng=pos.lng; } }
-    }
-    if(isFinite(lat) && isFinite(lng)) pdf.text(`Lat: ${Number(lat).toFixed(6)}  Lng: ${Number(lng).toFixed(6)}  (${v.src==='gps'?'GPS':'Auto'})`, 10, y);
-    else pdf.text('Coordinate non disponibili', 10, y);
-    y+=6;
-    if(v.note){ pdf.text(`Note: ${v.note}`, 10, y); y+=6; }
-    if(v.foto){ try{ pdf.addImage(v.foto, 'JPEG', 10, y, 60, 45); y+=50; }catch(e){ y+=6; } }
-    pdf.line(10, y, 200, y); y+=6;
-  }
-
-  pdf.save('visite-pdv.pdf');
-
-  if(restoreRoute){
-    const src = visite.filter(v=>v.lat && v.lng).map(v=>({lat:v.lat,lng:v.lng}));
-    const route = await routeOSRM(src); layerRoute = L.geoJSON(route.geometry, { style:{ color:'#4cc9f0', weight:5 } }).addTo(map);
-  }
-};
+el.fabPDF.onclick = async ()=>{ const { jsPDF } = window.jspdf; const pdf = new jsPDF('p','mm','a4'); let restoreRoute=false; if(layerRoute){ map.removeLayer(layerRoute); restoreRoute=true; } if(el.mappa.style.display==='none'){ await mostraMappa(); if(layerRoute){ map.removeLayer(layerRoute); restoreRoute=true; } } else { const src = visite.filter(v=>v.lat && v.lng); const pts = src.map(v=>({lat:v.lat,lng:v.lng})); const visitedFlags = src.map(v=>!!v.visited); addNumberedMarkers(pts, visitedFlags); } await sleep(500); try{ const canvas = await html2canvas(el.mappa, {useCORS:true, backgroundColor:null, scale:2}); const img = canvas.toDataURL('image/png'); const pageWidth = 210, margin=10, imgW=pageWidth-2*margin, imgH=imgW*0.6; pdf.addImage(img,'PNG', margin, 12, imgW, imgH); }catch(e){ pdf.setFontSize(12); pdf.text('Impossibile catturare la mappa. Verifica connessione o riprova.', 10, 20); } let y = 12 + (pageWidth-20)*0.6 + 10; pdf.setFontSize(14); pdf.text('Report Visite Punti Vendita', 10, y); y+=8; pdf.setFontSize(11); for(const v of visite){ if(y>270){ pdf.addPage(); y=12; } pdf.text(`PDV: ${v.nome||''}`, 10, y); y+=6; if(v.address) { pdf.text(`Indirizzo: ${v.address}`, 10, y); y+=6; } let lat=v.lat, lng=v.lng; if(v.src!=='gps' && (!isValidCoord(v))){ if(v.address){ const pos = await geocodeAddress(v.address); if(pos){ lat=pos.lat; lng=pos.lng; } } } if(isFinite(lat) && isFinite(lng)) pdf.text(`Lat: ${Number(lat).toFixed(6)}  Lng: ${Number(lng).toFixed(6)}  (${v.src==='gps'?'GPS':'Auto'})`, 10, y); else pdf.text('Coordinate non disponibili', 10, y); y+=6; if(v.note){ pdf.text(`Note: ${v.note}`, 10, y); y+=6; } if(v.foto){ try{ pdf.addImage(v.foto, 'JPEG', 10, y, 60, 45); y+=50; }catch(e){ y+=6; } } pdf.line(10, y, 200, y); y+=6; } pdf.save('visite-pdv.pdf'); if(restoreRoute){ const src = visite.filter(v=>v.lat && v.lng).map(v=>({lat:v.lat,lng:v.lng})); const route = await routeOSRM(src); layerRoute = L.geoJSON(route.geometry, { style:{ color:'#4cc9f0', weight:5 } }).addTo(map); } };
 
 // ===== Start =====
 render();

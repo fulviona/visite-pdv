@@ -48,3 +48,11 @@ button.primary{border-color:#2f4bff}
 .modal-inner h3{margin:0 0 10px 0}
 .modal-footer{margin-top:10px; text-align:right}
 .modal .primary{border-color:#2f4bff}
+
+/* Overlay centrale AVVIA NAVIGAZIONE (fix iPhone) */
+.go-overlay{position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:10000}
+.go-box{background:#0f141b; border:1px solid #2f3e56; padding:18px; border-radius:14px; width:min(420px, 92vw); text-align:center}
+.go-title{margin-bottom:10px; color:#e8f0fe; font-weight:700}
+.go-btn{background:#184b2e; border:1px solid #1b7a44; color:#dff7e7; font-size:16px; padding:12px; border-radius:12px; width:100%;}
+.go-btn:hover{border-color:#22b76b}
+.go-cancel{margin-top:8px; width:100%; background:#2a2f3a; color:#d7e3ff; border:1px solid #3a455c; padding:10px; border-radius:10px}

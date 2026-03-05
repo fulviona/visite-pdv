@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Visite PDV – Free (OSM+OSRM) – v3.1</title>
+  <title>Visite PDV – Free (OSM+OSRM) – v3.2</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -52,13 +52,10 @@
       <button id="btn-tsp">🚀 Ottimizza ordine (TSP)</button>
     </div>
     <div id="mappa" style="height: 380px; display: none"></div>
-
-    <!-- NUOVO: bottone Naviga, posizionato sotto la mappa e PRIMA delle istruzioni (scelta B) -->
     <div class="btn-row" style="margin-top:10px;">
       <button id="btn-nav" class="primary">🚘 Naviga</button>
       <small class="muted">Dopo l'ottimizzazione, premi "Naviga" per scegliere l'app.</small>
     </div>
-
     <h3>Istruzioni turn‑by‑turn</h3>
     <ol id="istruzioni"></ol>
   </section>
@@ -84,6 +81,15 @@
       <div class="modal-footer">
         <button id="nav-cancel">Annulla</button>
       </div>
+    </div>
+  </div>
+
+  <!-- NUOVO: Overlay centrale "AVVIA NAVIGAZIONE" (fix iPhone) -->
+  <div id="go-overlay" class="go-overlay hidden">
+    <div class="go-box">
+      <div class="go-title">Aprire l'app di navigazione selezionata?</div>
+      <button id="go-btn" class="go-btn">➡️ AVVIA NAVIGAZIONE</button>
+      <button id="go-cancel" class="go-cancel">Annulla</button>
     </div>
   </div>
 
