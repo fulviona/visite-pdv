@@ -816,16 +816,26 @@ setTimeout(() => {
 
   el.btnMappa.onclick = () => mostraMappa();
 
-  el.btnTSP.onclick = async () => {
+el.btnTSP.onclick = async () => {
     if (visite.length < 2) return alert('Servono almeno 2 punti');
 
     const validi = visite.filter(v => v.lat && v.lng);
     const pts = validi.map(v => ({ lat: v.lat, lng: v.lng }));
+    const ordered = tspOrder(pts);
 
-    lastOrderedPts = tspOrder(pts);
-    await mostraMappa(lastOrderedPts);
-    // Nessun popup automatico — "Naviga" lo apre manualmente
-  };
+    // --- RIORDINA l’array visite secondo il percorso ottimizzato ---
+    visite = ordered.map(o =>
+        visite.find(v =>
+            v.lat === o.lat &&
+            v.lng === o.lng &&
+            v.nome === o.nome   // controllo extra importantissimo
+        )
+    );
+
+    save();
+    render();
+    await mostraMappa(visite);
+};
 
   el.btnNav.onclick = () => {
     const src = (lastOrderedPts && lastOrderedPts.length)
