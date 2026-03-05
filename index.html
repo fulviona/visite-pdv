@@ -1,102 +1,147 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Visite PDV – Free (OSM+OSRM) – v3.2</title>
+  <title>Visite PDV – Free (OSM + OSRM) – v3.3</title>
+
+  <!-- Stili dell’app -->
   <link rel="stylesheet" href="style.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Leaflet (mappa) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity=""
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity=""
+    crossorigin=""
+  ></script>
+
+  <!-- Librerie utili (Excel, PDF, screenshot mappa) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
-  <header>
-    <h1>Visite Punti Vendita – Versione Gratuita</h1>
+
+  <!-- Schermata di caricamento (spinner arancione, con dissolvenza in uscita) -->
+  <div id="loading-screen" aria-live="polite" aria-busy="true">
+    <div class="loader" aria-hidden="true"></div>
+    <div class="loading-text">Caricamento...</div>
+  </div>
+
+  <header class="app-header">
+    <h1>Visite Punti Vendita</h1>
   </header>
 
-  <section class="panel">
-    <h2>Nuova visita</h2>
+  <!-- Pannello: Nuova visita -->
+  <section class="panel" aria-labelledby="tit-nuova-visita">
+    <h2 id="tit-nuova-visita">Nuova visita</h2>
+
     <div class="grid-2">
-      <input id="pdv-name" placeholder="Nome punto vendita" />
-      <input id="pdv-address" placeholder="Indirizzo (via, città)" />
+      <input id="pdv-name" placeholder="Nome punto vendita" autocomplete="off" />
+      <input id="pdv-address" placeholder="Indirizzo (via, città)" autocomplete="off" />
     </div>
+
     <textarea id="note" placeholder="Note visita"></textarea>
+
     <div class="grid-2">
       <input type="file" id="foto" accept="image/*" capture="environment" />
       <div class="btn-row">
-        <button id="btn-gps" title="Usa la posizione attuale">📍 Usa posizione attuale</button>
-        <button id="btn-salva">💾 Salva visita</button>
+        <button id="btn-gps" type="button" title="Usa la posizione attuale">📍 Usa posizione attuale</button>
+        <button id="btn-salva" type="button" title="Salva visita">💾 Salva visita</button>
       </div>
     </div>
-    <small class="muted">Suggerimento: dopo il GPS puoi comunque correggere indirizzo/nome prima di salvare.</small>
+
+    <small class="muted">Suggerimento: dopo il GPS puoi correggere indirizzo/nome prima di salvare.</small>
   </section>
 
-  <section class="panel">
-    <h2>Importa da Excel</h2>
-    <p>Formato richiesto (intestazioni): <code>Cod_Punto</code>, <code>regione_PV</code>, <code>Sede</code>, <code>Indirizzo Sede</code>, <code>Cap Sede</code></p>
+  <!-- Pannello: Import da Excel -->
+  <section class="panel" aria-labelledby="tit-import-excel">
+    <h2 id="tit-import-excel">Importa da Excel</h2>
+    <p class="muted">
+      Formato richiesto (intestazioni): <code>Cod_Punto</code>, <code>regione_PV</code>, <code>Sede</code>,
+      <code>Indirizzo Sede</code>, <code>Cap Sede</code>
+    </p>
+
     <input type="file" id="excel" accept=".xlsx" />
     <div class="btn-row">
-      <button id="btn-importa">📥 Importa</button>
-      <button id="btn-clear">🗑 Cancella tutte le visite</button>
+      <button id="btn-importa" type="button">📥 Importa</button>
+      <button id="btn-clear" type="button">🗑 Cancella tutte le visite</button>
     </div>
-    <div id="import-status" class="status"></div>
+
+    <div id="import-status" class="status" role="status" aria-live="polite"></div>
   </section>
 
-  <section class="panel">
-    <h2>Mappa e percorso</h2>
+  <!-- Pannello: Mappa + Percorso + TSP + Naviga -->
+  <section class="panel" aria-labelledby="tit-mappa">
+    <h2 id="tit-mappa">Mappa e percorso</h2>
+
     <div class="grid-2">
-      <button id="btn-mappa">🗺️ Mostra mappa + percorso</button>
-      <button id="btn-tsp">🚀 Ottimizza ordine (TSP)</button>
+      <button id="btn-mappa" type="button">🗺️ Mostra mappa + percorso</button>
+      <button id="btn-tsp" type="button">🚀 Ottimizza ordine (TSP)</button>
     </div>
-    <div id="mappa" style="height: 380px; display: none"></div>
-    <div class="btn-row" style="margin-top:10px;">
-      <button id="btn-nav" class="primary">🚘 Naviga</button>
+
+    <div id="mappa" style="height: 380px; display: none;" aria-label="Mappa dei punti vendita"></div>
+
+    <!-- Bottone Naviga (compare sotto la mappa, sopra le istruzioni) -->
+    <div class="btn-row" style="margin-top: 10px;">
+      <button id="btn-nav" class="primary" type="button">🚘 Naviga</button>
       <small class="muted">Dopo l'ottimizzazione, premi "Naviga" per scegliere l'app.</small>
     </div>
+
     <h3>Istruzioni turn‑by‑turn</h3>
-    <ol id="istruzioni"></ol>
+    <ol id="istruzioni" aria-live="polite"></ol>
   </section>
 
-  <section class="panel">
-    <h2>Lista punti vendita</h2>
+  <!-- Pannello: Lista PDV -->
+  <section class="panel" aria-labelledby="tit-lista">
+    <h2 id="tit-lista">Lista punti vendita</h2>
     <ul id="lista" class="lista"></ul>
   </section>
 
-  <!-- Floating PDF FAB -->
-  <button id="fab-pdf" class="fab" title="Esporta PDF">📄</button>
+  <!-- FAB PDF (pulsante fluttuante) -->
+  <button id="fab-pdf" class="fab" title="Esporta PDF" aria-label="Esporta PDF">📄</button>
 
-  <!-- Modal scelta navigazione -->
-  <div id="nav-modal" class="modal hidden">
+  <!-- Modal: scelta app di navigazione (popup elegante + dissolvenza) -->
+  <div id="nav-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="nav-modal-title">
     <div class="modal-inner">
-      <h3>Scegli l'app di navigazione</h3>
+      <h3 id="nav-modal-title">Scegli l'app di navigazione</h3>
+
       <div class="modal-actions">
-        <button data-app="google" class="primary">Google Maps (default)</button>
-        <button data-app="waze">Waze</button>
-        <button data-app="apple">Apple Maps</button>
-        <button data-app="osm">OpenStreetMap</button>
+        <button data-app="google" class="primary" type="button">Google Maps (default)</button>
+        <button data-app="waze" type="button">Waze</button>
+        <button data-app="apple" type="button">Apple Maps</button>
+        <button data-app="osm" type="button">OpenStreetMap</button>
       </div>
+
       <div class="modal-footer">
-        <button id="nav-cancel">Annulla</button>
+        <button id="nav-cancel" type="button">Annulla</button>
       </div>
     </div>
   </div>
 
-  <!-- NUOVO: Overlay centrale "AVVIA NAVIGAZIONE" (fix iPhone) -->
-  <div id="go-overlay" class="go-overlay hidden">
-    <div class="go-box">
-      <div class="go-title">Aprire l'app di navigazione selezionata?</div>
-      <button id="go-btn" class="go-btn">➡️ AVVIA NAVIGAZIONE</button>
-      <button id="go-cancel" class="go-cancel">Annulla</button>
+  <!-- Overlay centrale AVVIA NAVIGAZIONE (iPhone-safe) – con dissolvenza -->
+  <div id="go-overlay" class="go-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="go-title">
+    <div class="go-box" role="group" aria-describedby="go-title">
+      <div id="go-title" class="go-title">Aprire l'app di navigazione selezionata?</div>
+      <button id="go-btn" class="go-btn" type="button">➡️ AVVIA NAVIGAZIONE</button>
+      <button id="go-cancel" class="go-cancel" type="button">Annulla</button>
     </div>
   </div>
 
-  <footer>
-    <small class="muted">OpenStreetMap + OSRM. Dati salvati in locale sul dispositivo.</small>
-  </footer>
+  <!-- Avviso per chi disabilita JS -->
+  <noscript>
+    <div class="noscript">
+      Per usare questa applicazione è necessario abilitare JavaScript.
+    </div>
+  </noscript>
 
-  <script src="app.js"></script>
+  <!-- Logica dell’app -->
+  <script src="app.js" defer></script>
 </body>
 </html>
