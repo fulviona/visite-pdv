@@ -154,13 +154,34 @@ async function mostraMappa(percorsoPunti) {
   try {
     const route = await routeOSRM(pts);
     if (layerRoute) map.removeLayer(layerRoute);
-    layerRoute = L.geoJSON(route.geometry, { style: { color: '#4cc9f0', weight: 5 } }).addTo(map);
-    renderIstruzioni(route);
+    layerRoute = L.geoJSON(route.geometry, { style:{ color:'#4cc9f0', weight:5 }
+    }).addTo(map);
+    
+    // aggiorna mini-scheda percorso
+    aggiornaRiepilogoPercorso(route);
+
   } catch (err) {
     alert('Routing non disponibile: ' + err.message);
   }
 }
 function renderIstruzioni(route) {
+  function aggiornaRiepilogoPercorso(route) {
+    if (!route) {
+        el.routeSummary.style.display = "none";
+        return;
+    }
+
+    const distanzaKm = km(route.distance);
+    const tempoMin = mm(route.duration);
+
+    el.routeSummary.innerHTML = `
+        <div><strong>Distanza totale:</strong> ${distanzaKm} km</div>
+        <div><strong>Tempo stimato:</strong> ${tempoMin} min</div>
+    `;
+
+    el.routeSummary.style.display = "block";
+}
+``
   el.istr.innerHTML = '';
   let stepCount = 1;
   route.legs.forEach((leg) => {
@@ -468,6 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lista: document.getElementById('lista'),
     mappa: document.getElementById('mappa'),
     istr: document.getElementById('istruzioni'),
+    routeSummary: document.getElementById('route-summary'),
     btnGPS: document.getElementById('btn-gps'),
     btnSalva: document.getElementById('btn-salva'),
     btnImport: document.getElementById('btn-importa'),
