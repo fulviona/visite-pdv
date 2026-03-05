@@ -209,160 +209,187 @@ function addNumberedMarkers(pts, visitedFlags) {
 let editingIndex = -1;
 
 function render() {
-  el.lista.innerHTML = '';
+    el.lista.innerHTML = '';
 
-  visite.forEach((v, i) => {
-    const li = document.createElement('li');
-    li.className = 'item';
+    visite.forEach((v, i) => {
+        const li = document.createElement('li');
+        li.className = 'item';
 
-    // Riga principale
-    const row = document.createElement('div');
-    row.className = 'row';
+        /* ---- RIGA PRINCIPALE ---- */
+        const row = document.createElement('div');
+        row.className = 'row';
 
-    const info = document.createElement('div');
-    info.innerHTML = `
-      <div class="title">${v.nome || 'Senza nome'}</div>
-      <div class="addr">${v.address || ''}</div>
-    `;
+        const info = document.createElement('div');
+        info.innerHTML = `
+            <div class="title">${v.nome || 'Senza nome'}</div>
+            <div class="addr">${v.address || ''}</div>
+        `;
 
-    const right = document.createElement('div');
-    right.className = 'tags';
-    const tag = document.createElement('span');
-    tag.className = 'tag' + (v.visited ? ' visited' : '');
-    tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
-    tag.onclick = () => {
-        v.visited = !v.visited;
-        save();
-        render();
+        const right = document.createElement('div');
+        right.className = 'tags';
 
-    // Aggiorna i marker se la mappa è aperta
-    if (map && el.mappa.style.display !== 'none') {
-       
-        const src = visite.filter(v => v.lat && v.lng);
-        const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
-        const visitedFlags = src.map(v => !!v.visited);
+        const tag = document.createElement('span');
+        tag.className = 'tag' + (v.visited ? ' visited' : '');
+        tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
 
-        addNumberedMarkers(pts, visitedFlags);
-      // --- SE NON CI SONO PIÙ PDV: SVUOTA LA MAPPA ---
-if (visite.length === 0) {
+        // CLICK SU “VISITATO”
+        tag.onclick = () => {
+            v.visited = !v.visited;
+            save();
+            render();
 
-    // 1) Rimuove il percorso OSRM
-    if (layerRoute) {
-        map.removeLayer(layerRoute);
-        layerRoute = null;
-    }
+            // Aggiorna marker se la mappa è aperta
+            if (map && el.mappa.style.display !== 'none') {
+                const src = visite.filter(v => v.lat && v.lng);
+                const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
+                const visitedFlags = src.map(v => !!v.visited);
+                addNumberedMarkers(pts, visitedFlags);
+            }
+        };
 
-    // 2) Rimuove TUTTI i marker
-    if (map) {
+        right.appendChild(tag);
+        row.appendChild(info);
+        row.appendChild(right);
+        li.appendChild(row);
+
+        /* ---- AZIONI ---- */
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const bEdit = document.createElement('button');
+        bEdit.textContent = '✏ Modifica';
+        bEdit.onclick = () => {
+            editingIndex = (editingIndex === i ? -1 : i);
+            render();
+        };
+
+        const bDel = document.createElement('button');
+        bDel.className = 'danger';
+        bDel.textContent = '❌ Elimina';
+        bDel.onclick = () => onDelete(i);
+
+        const bRemPhoto = document.createElement('button');
+        bRemPhoto.textContent = '🖼 Rimuovi foto';
+        bRemPhoto.onclick = () => onRemovePhoto(i);
+
+        actions.append(bEdit, bRemPhoto, bDel);
+        li.appendChild(actions);
+
+        /* ---- FOTO THUMBNAIL ---- */
+        if (v.foto) {
+            const img = document.createElement('img');
+            img.src = v.foto;
+            img.className = 'thumb';
+            img.alt = 'foto';
+            img.onclick = () => window.open(v.foto, '_blank');
+            li.appendChild(img);
+        }
+
+        /* ---- EDITOR INLINE ---- */
+        if (editingIndex === i) {
+            const ed = document.createElement('div');
+            ed.className = 'editor';
+            ed.innerHTML = `
+                <div class="grid-2">
+                    <input id="e-nome" value="${v.nome || ''}"/>
+                    <input id="e-address" value="${v.address || ''}"/>
+                </div>
+                <textarea id="e-note">${v.note || ''}</textarea>
+                <div class="btn-row">
+                    <button id="e-geocode">🔄 Geocoding indirizzo</button>
+                    <button id="e-gps">📍 Usa posizione attuale</button>
+                    <input type="file" id="e-foto" accept="image/*" />
+                </div>
+                <div class="btn-row">
+                    <button id="e-save">💾 Salva modifiche</button>
+                    <button id="e-cancel">↩ Annulla</button>
+                </div>
+            `;
+            li.appendChild(ed);
+
+            // Annulla
+            ed.querySelector('#e-cancel').onclick = () => {
+                editingIndex = -1;
+                render();
+            };
+
+            // Salva
+            ed.querySelector('#e-save').onclick = () => {
+                v.nome = ed.querySelector('#e-nome').value.trim();
+                v.address = ed.querySelector('#e-address').value.trim();
+                v.note = ed.querySelector('#e-note').value;
+
+                const f = ed.querySelector('#e-foto').files[0];
+                if (f) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        v.foto = e.target.result;
+                        save();
+                        editingIndex = -1;
+                        render();
+                    };
+                    reader.readAsDataURL(f);
+                } else {
+                    save();
+                    editingIndex = -1;
+                    render();
+                }
+            };
+
+            // Geocoding
+            ed.querySelector('#e-geocode').onclick = async () => {
+                const a = ed.querySelector('#e-address').value.trim();
+                if (!a) return alert('Inserisci un indirizzo.');
+                const pos = await geocodeAddress(a);
+                if (!pos) return alert('Indirizzo non trovato.');
+                v.lat = pos.lat;
+                v.lng = pos.lng;
+                v.src = 'geocode';
+                save();
+                alert('Coordinate aggiornate.');
+            };
+
+            // GPS
+            ed.querySelector('#e-gps').onclick = () => {
+                navigator.geolocation.getCurrentPosition(async gp => {
+                    v.lat = gp.coords.latitude;
+                    v.lng = gp.coords.longitude;
+                    v.address = await reverseGeocode(v.lat, v.lng) || v.address;
+                    v.src = 'gps';
+                    save();
+                    render();
+                }, err => alert('GPS non disponibile: ' + err.message), {
+                    enableHighAccuracy: true,
+                    timeout: 10000
+                });
+            };
+        }
+
+        el.lista.appendChild(li);
+    });
+
+    /* -------------------------------------------------
+       SE NON CI SONO PIÙ PDV → RESET COMPLETO MAPPA
+    -------------------------------------------------- */
+    if (visite.length === 0 && map) {
+
+        // 1) Rimuovi percorso OSRM
+        if (layerRoute) {
+            map.removeLayer(layerRoute);
+            layerRoute = null;
+        }
+
+        // 2) Rimuovi tutti i marker
         map.eachLayer(layer => {
             if (layer instanceof L.Marker) map.removeLayer(layer);
         });
+
+        // 3) Nascondi mini scheda
+        el.routeSummary.style.display = 'none';
+
+        // 4) Reset vista Italia
+        map.setView([41.8719, 12.5674], 6);
     }
-
-    // 3) Nasconde la mini‑scheda riepilogo
-    if (el.routeSummary) {
-        el.routeSummary.style.display = "none";
-    }
-
-    // 4) Reset della mappa (zoom Italia)
-    if (map) {
-        map.setView([41.8719, 12.5674], 6); // Italia
-    }
-}
-    }
-};
-    right.appendChild(tag);
-
-    row.appendChild(info);
-    row.appendChild(right);
-    li.appendChild(row);
-
-    // Azioni
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-
-    const bEdit = document.createElement('button');
-    bEdit.textContent = '✏ Modifica';
-    bEdit.onclick = () => { editingIndex = (editingIndex === i ? -1 : i); render(); };
-
-    const bDel = document.createElement('button');
-    bDel.className = 'danger';
-    bDel.textContent = '❌ Elimina';
-    bDel.onclick = () => onDelete(i);
-
-    const bRemPhoto = document.createElement('button');
-    bRemPhoto.textContent = '🖼 Rimuovi foto';
-    bRemPhoto.onclick = () => onRemovePhoto(i);
-
-    actions.append(bEdit, bRemPhoto, bDel);
-    li.appendChild(actions);
-
-    // Thumbnail
-    if (v.foto) {
-      const img = document.createElement('img');
-      img.src = v.foto;
-      img.className = 'thumb';
-      img.alt = 'foto';
-      img.onclick = () => window.open(v.foto, '_blank');
-      li.appendChild(img);
-    }
-
-    // Editor inline
-    if (editingIndex === i) {
-      const ed = document.createElement('div');
-      ed.className = 'editor';
-      ed.innerHTML = `
-        <div class="grid-2">
-          <input id="e-nome" value="${v.nome || ''}"/>
-          <input id="e-address" value="${v.address || ''}"/>
-        </div>
-        <textarea id="e-note">${v.note || ''}</textarea>
-        <div class="btn-row">
-          <button id="e-geocode">🔄 Geocoding indirizzo</button>
-          <button id="e-gps">📍 Usa posizione attuale</button>
-          <input type="file" id="e-foto" accept="image/*" />
-        </div>
-        <div class="btn-row">
-          <button id="e-save">💾 Salva modifiche</button>
-          <button id="e-cancel">↩ Annulla</button>
-        </div>
-      `;
-      li.appendChild(ed);
-
-      ed.querySelector('#e-cancel').onclick = () => { editingIndex = -1; render(); };
-      ed.querySelector('#e-save').onclick = () => {
-        v.nome = ed.querySelector('#e-nome').value.trim();
-        v.address = ed.querySelector('#e-address').value.trim();
-        v.note = ed.querySelector('#e-note').value;
-
-        const f = ed.querySelector('#e-foto').files[0];
-        if (f) {
-          const reader = new FileReader();
-          reader.onload = (e) => { v.foto = e.target.result; save(); editingIndex = -1; render(); };
-          reader.readAsDataURL(f);
-        } else {
-          save(); editingIndex = -1; render();
-        }
-      };
-
-      ed.querySelector('#e-geocode').onclick = async () => {
-        const a = ed.querySelector('#e-address').value.trim();
-        if (!a) return alert('Inserisci un indirizzo.');
-        const pos = await geocodeAddress(a);
-        if (!pos) return alert('Indirizzo non trovato.');
-        v.lat = pos.lat; v.lng = pos.lng; v.src = 'geocode'; save(); alert('Coordinate aggiornate.');
-      };
-
-      ed.querySelector('#e-gps').onclick = () => {
-        navigator.geolocation.getCurrentPosition(async gp => {
-          v.lat = gp.coords.latitude; v.lng = gp.coords.longitude;
-          v.address = await reverseGeocode(v.lat, v.lng) || v.address; v.src = 'gps'; save(); render();
-        }, err => alert('GPS non disponibile: ' + err.message), { enableHighAccuracy: true, timeout: 10000 });
-      };
-    }
-
-    el.lista.appendChild(li);
-  });
 }
 
 /* Azioni su singolo PDV */
