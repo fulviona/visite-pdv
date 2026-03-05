@@ -128,17 +128,45 @@ function ensureMap() {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true }).addTo(map);
   return map;
 }
+
 function addNumberedMarkers(pts, visitedFlags) {
-  // Pulizia marker precedenti
-  map.eachLayer(l => { if (l instanceof L.Marker) map.removeLayer(l); });
+  // Rimuove i marker precedenti
+  map.eachLayer(layer => {
+    if (layer instanceof L.Marker) map.removeLayer(layer);
+  });
+
   pts.forEach((p, idx) => {
     const visited = visitedFlags[idx];
-    const colorClass = visited ? 'marker-green' : 'marker-red';
-    const html = `<div class="marker-num ${colorClass}">${idx + 1}</div>`;
-    const icon = L.divIcon({ className: '', html, iconSize: [28, 28], iconAnchor: [14, 14] });
-    L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(`#${idx + 1}`);
+
+    const icon = visited
+      ? L.divIcon({
+          className: 'marker-visited',     // ✔️ verde (css)
+          html: '✔️',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        })
+      : L.divIcon({
+          className: 'marker-notvisited',  // 🔴 numerata (css)
+          html: `${idx + 1}`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+
+    L.marker([p.lat, p.lng], { icon })
+      .addTo(map)
+      .bindPopup(`#${idx + 1}`);
   });
 }
+
+function refreshMarkersIfVisible() {
+  if (map && el.mappa && el.mappa.style.display !== 'none') {
+    const src = visite.filter(v => v.lat && v.lng);
+    const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
+    const visitedFlags = src.map(v => !!v.visited);
+    addNumberedMarkers(pts, visitedFlags);
+  }
+}
+
 async function mostraMappa(percorsoPunti) {
   if (!visite.length) return alert('Nessun punto.');
   const source = (percorsoPunti && percorsoPunti.length ? percorsoPunti : visite).filter(v => v.lat && v.lng);
@@ -235,7 +263,14 @@ function render() {
 
     const right = document.createElement('div'); right.className = 'tags';
     const tag = document.createElement('span'); tag.className = 'tag' + (v.visited ? ' visited' : ''); tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
-    tag.onclick = () => { v.visited = !v.visited; save(); render(); };
+tag.onclick = () => {
+  v.visited = !v.visited;
+  save();
+  render();
+  // aggiorna i marker subito, se la mappa è aperta
+  refreshMarkersIfVisible();
+};
+
     right.appendChild(tag);
 
     row.appendChild(info); row.appendChild(right);
@@ -306,8 +341,13 @@ function render() {
 }
 
 function onDelete(i) {
-  if (!confirm('Eliminare questa visita?')) return; visite.splice(i, 1); save(); render();
+  if (!confirm('Eliminare questa visita?')) return;
+  visite.splice(i, 1);
+  save();
+  render();
+  refreshMarkersIfVisible(); // opzionale
 }
+
 function onRemovePhoto(i) {
   if (!visite[i].foto) return alert('Nessuna foto da rimuovere.'); if (!confirm('Rimuovere la foto?')) return; visite[i].foto = ''; save(); render();
 }
