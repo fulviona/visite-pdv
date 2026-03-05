@@ -2,7 +2,6 @@
    VISITE PDV – v3.3 (finale)
    Logica completa applicazione
    ========================================================= */
-
 /* -----------------------------
    Persistenza e stato globale
 ----------------------------- */
@@ -898,3 +897,4 @@ window.addEventListener('load', () => {
   const scr = document.getElementById('loading-screen');
   if (scr) setTimeout(() => scr.classList.add('hidden'), 400);
 });
+
