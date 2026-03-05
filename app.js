@@ -806,7 +806,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 /* -----------------------------
-   Loading screen
+     Loading screen
 ----------------------------- */
 window.addEventListener('load',()=>{
   const scr=document.getElementById('loading-screen');
