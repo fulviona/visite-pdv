@@ -192,45 +192,60 @@ async function mostraMappa(percorsoPunti) {
     alert('Routing non disponibile: ' + err.message);
   }
 }
-function renderIstruzioni(route) {
 
-/* === MINI-SCHEDA RIEPILOGO PERCORSO === */
+/* -----------------------------
+   MINI-SCHEDA riepilogo percorso
+----------------------------- */
 function aggiornaRiepilogoPercorso(route) {
+  if (!route) {
+    el.routeSummary.style.display = 'none';
+    return;
+  }
 
-    if (!route) {
-        el.routeSummary.style.display = "none";
-        return;
-    }
+  const distanzaKm = km(route.distance);
+  const totalSec = Math.round(route.duration);
+  const ore = Math.floor(totalSec / 3600);
+  const min = Math.round((totalSec % 3600) / 60);
+  const tempoFormattato = `${ore} h ${min} min`;
 
-    const distanzaKm = km(route.distance);
-    const tempoMin = mm(route.duration);
+  el.routeSummary.innerHTML = `
+    <div><strong>Distanza totale:</strong> ${distanzaKm} km</div>
+    <div><strong>Tempo stimato:</strong> ${tempoFormattato}</div>
+  `;
 
-    el.routeSummary.innerHTML = `
-        <div><strong>Distanza totale:</strong> ${distanzaKm} km</div>
-        <div><strong>Tempo stimato:</strong> ${tempoMin} min</div>
-    `;
-
-    el.routeSummary.style.display = "block";
+  el.routeSummary.style.display = 'block';
 }
-``
 
+/* -----------------------------
+   Istruzioni turn-by-turn
+----------------------------- */
+function renderIstruzioni(route) {
+  el.istr.innerHTML = '';
+  if (!route || !route.legs) return;
 
-  function aggiornaRiepilogoPercorso(route) {
-    if (!route) {
-        el.routeSummary.style.display = "none";
-        return;
-    }
+  let stepCount = 1;
 
-    const distanzaKm = km(route.distance);
-    const tempoMin = mm(route.duration);
+  route.legs.forEach(leg => {
+    leg.steps.forEach(step => {
+      const liEl = document.createElement('li');
 
-    el.routeSummary.innerHTML = `
-        <div><strong>Distanza totale:</strong> ${distanzaKm} km</div>
-        <div><strong>Tempo stimato:</strong> ${tempoMin} min</div>
-    `;
+      const name = step.name && step.name !== '-' ? step.name : 'strada senza nome';
+      const mod = step.maneuver && step.maneuver.modifier ? step.maneuver.modifier : '';
 
-    el.routeSummary.style.display = "block";
+      liEl.textContent = `${stepCount}. ${
+          mod ? mod + ': ' : ''
+        }prosegui su ${name} per ${km(step.distance)} km`;
+
+      el.istr.appendChild(liEl);
+      stepCount++;
+    });
+  });
+
+  const liSum = document.createElement('li');
+  liSum.innerHTML = `<strong>Totale:</strong> ${km(route.distance)} km, ${mm(route.duration)} min`;
+  el.istr.appendChild(liSum);
 }
+
 ``
   el.istr.innerHTML = '';
   let stepCount = 1;
