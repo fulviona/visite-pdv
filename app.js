@@ -483,12 +483,37 @@ function importExcel() {
    Cancella TUTTE le visite
 ----------------------------- */
 function clearAll() {
-  if (!visite.length) return alert('Nessuna visita salvata.');
-  if (!confirm('Attenzione: vuoi eliminare TUTTE le visite?')) return;
-  if (!confirm('Conferma definitiva: questa azione è irreversibile.')) return;
+    if (!visite.length) return alert('Nessuna visita salvata.');
+    if (!confirm('Attenzione: vuoi eliminare TUTTE le visite?')) return;
+    if (!confirm('Conferma definitiva: questa azione è irreversibile.')) return;
 
-  visite = []; save(); render(); el.status.textContent = 'Lista svuotata.';
+    // Svuota lista
+    visite = [];
+    save();
+    render();
+    el.status.textContent = 'Lista svuotata.';
+
+    // --- RESET COMPLETO MAPPA ---
+    if (map) {
+        // 1) Rimuovi polyline OSRM
+        if (layerRoute) {
+            map.removeLayer(layerRoute);
+            layerRoute = null;
+        }
+
+        // 2) Rimuovi TUTTI i marker
+        map.eachLayer(layer => {
+            if (layer instanceof L.Marker) map.removeLayer(layer);
+        });
+
+        // 3) Nascondi mini‑scheda
+        el.routeSummary.style.display = "none";
+
+        // 4) Reset vista Italia
+        map.setView([41.8719, 12.5674], 6);
+    }
 }
+
 function clearImportedPoints() {
   // Chiede conferma all'utente
   const msg = [
