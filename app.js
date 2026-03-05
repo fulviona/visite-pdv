@@ -677,6 +677,18 @@ async function exportPDF() {
    Init (DOMContentLoaded) + Eventi
 ----------------------------- */
 document.addEventListener('DOMContentLoaded', () => {
+       
+// BINDING A PROVA DI ERRORE
+setTimeout(() => {
+  const btn = document.getElementById('btn-clear-import');
+  if (btn) {
+    btn.onclick = clearImportedPoints;
+    console.log("btn-clear-import AGGANCIATO correttamente");
+  } else {
+    console.warn("btn-clear-import NON trovato nel DOM");
+  }
+}, 100);
+
 
   el = {
     name: document.getElementById('pdv-name'),
@@ -703,6 +715,7 @@ document.addEventListener('DOMContentLoaded', () => {
     goBtn: document.getElementById('go-btn'),
     goCancel: document.getElementById('go-cancel'),
     loading: document.getElementById('loading-screen')
+
   };
 
   // Eventi
