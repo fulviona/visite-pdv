@@ -14,9 +14,6 @@ let navigationFlowActive = false;
 
 /* Ultimo ordine TSP per Naviga (se serve) */
 let lastOrderedPts = null;
-/* Impostazioni applicazione (persistenti) */
-let appSettings = JSON.parse(localStorage.getItem('pdv_settings') || "{\"sound\":true}");
-function saveSettings(){ localStorage.setItem('pdv_settings', JSON.stringify(appSettings)); }
 
 /* -----------------------------
    Utility varie
@@ -767,15 +764,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   el.fabPDF.onclick = exportPDF;
 
-  // Imposta stato toggle suono + listener
-  if (el.toggleSound) {
-    el.toggleSound.checked = !!appSettings.sound;
-    el.toggleSound.addEventListener('change', () => {
-      appSettings.sound = !!el.toggleSound.checked;
-      saveSettings();
-      if (appSettings.sound) { try { playBeep(1320, 50, 0.05); } catch {} }
-    });
-  }
   // Render iniziale
   render();
 });
