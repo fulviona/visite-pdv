@@ -6,9 +6,7 @@
 /* ----------------------------- 
  Persistenza e stato globale 
 ----------------------------- */
-let visite = JSON.parse(localStorage.getItem('visite') \
-\
- '[]');
+let visite = JSON.parse(localStorage.getItem('visite') || '[]');
 function save() { localStorage.setItem('visite', JSON.stringify(visite)); }
 /* Flag per flusso navigazione iPhone-safe */
 let navigationFlowActive = false;
@@ -225,7 +223,7 @@ function render() {
  const li = document.createElement('li'); li.className = 'item';
  const row = document.createElement('div'); row.className = 'row';
  const info = document.createElement('div');
- info.innerHTML = `\n <div class="title">${v.nome||'Senza nome'}</div>\n <div class="addr">${v.address||''}</div>\n `;
+ info.innerHTML = `\n <div class=\"title\">${v.nome||'Senza nome'}</div>\n <div class=\"addr\">${v.address||''}</div>\n `;
  const right = document.createElement('div'); right.className = 'tags';
  const tag = document.createElement('span'); tag.className = 'tag' + (v.visited ? ' visited' : '');
  tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
@@ -239,7 +237,7 @@ function render() {
  if (v.foto) { const img = document.createElement('img'); img.src = v.foto; img.className = 'thumb'; img.alt = 'foto'; img.onclick = () => window.open(v.foto, '_blank'); li.appendChild(img); }
  if (editingIndex === i) {
  const ed = document.createElement('div'); ed.className = 'editor';
- ed.innerHTML = `\n <div class="grid-2">\n <input id="e-nome" value="${v.nome||''}"/>\n <input id="e-address" value="${v.address||''}"/>\n </div>\n <textarea id="e-note">${v.note||''}</textarea>\n <div class="btn-row">\n <button id="e-geocode">🔄 Geocoding indirizzo</button>\n <button id="e-gps">📍 Usa posizione attuale</button>\n <input type="file" id="e-foto" accept="image/*" />\n </div>\n <div class="btn-row">\n <button id="e-save">💾 Salva modifiche</button>\n <button id="e-cancel">↩ Annulla</button>\n </div>\n `;
+ ed.innerHTML = `\n <div class=\"grid-2\">\n <input id=\"e-nome\" value=\"${v.nome||''}\"/>\n <input id=\"e-address\" value=\"${v.address||''}\"/>\n </div>\n <textarea id=\"e-note\">${v.note||''}</textarea>\n <div class=\"btn-row\">\n <button id=\"e-geocode\">🔄 Geocoding indirizzo</button>\n <button id=\"e-gps\">📍 Usa posizione attuale</button>\n <input type=\"file\" id=\"e-foto\" accept=\"image/*\" />\n </div>\n <div class=\"btn-row\">\n <button id=\"e-save\">💾 Salva modifiche</button>\n <button id=\"e-cancel\">↩ Annulla</button>\n </div>\n `;
  li.appendChild(ed);
  ed.querySelector('#e-cancel').onclick = () => { editingIndex = -1; render(); };
  ed.querySelector('#e-save').onclick = () => {
