@@ -202,31 +202,36 @@ function aggiornaRiepilogoPercorso(route) {
 /* -----------------------------
    MOSTRA MAPPA (OSRM + marker + mini-scheda)
 ----------------------------- */
-async function mostraMappa(markersSource, routeSource) {
+async function mostraMappa(percorsoPunti) {
   if (!visite.length) return alert('Nessun punto.');
-  const allSrc = (markersSource && markersSource.length ? markersSource : visite)
+
+  const source = (percorsoPunti && percorsoPunti.length ? percorsoPunti : visite)
     .filter(v => v.lat && v.lng);
-  if (!allSrc.length) return alert('Nessun punto con coordinate valide.');
-  const ptsMarkers = allSrc.map(v => ({ lat: v.lat, lng: v.lng }));
-  const visitedFlags = allSrc.map(v => !!v.visited);
+
+  if (!source.length) return alert('Nessun punto con coordinate valide.');
+
+  const pts = source.map(v => ({ lat: v.lat, lng: v.lng }));
+  const visitedFlags = source.map(v => !!v.visited);
+
   ensureMap();
-  const bounds = L.latLngBounds(ptsMarkers.map(p => [p.lat, p.lng]));
+
+  const bounds = L.latLngBounds(pts.map(p => [p.lat, p.lng]));
   map.fitBounds(bounds.pad(0.2));
-  addNumberedMarkers(ptsMarkers, visitedFlags);
+
+  addNumberedMarkers(pts, visitedFlags);
+
   try {
-    const routeSrc = (routeSource && routeSource.length ? routeSource : allSrc)
-      .map(v => ({ lat: v.lat, lng: v.lng }));
-    if (routeSrc.length >= 2) {
-      const route = await routeOSRM(routeSrc);
-      if (layerRoute) map.removeLayer(layerRoute);
-      layerRoute = L.geoJSON(route.geometry, {
-        style: { color: '#4cc9f0', weight: 5 }
-      }).addTo(map);
-      aggiornaRiepilogoPercorso(route);
-    } else {
-      if (layerRoute) { map.removeLayer(layerRoute); layerRoute = null; }
-      aggiornaRiepilogoPercorso(null);
-    }
+    const route = await routeOSRM(pts);
+
+    if (layerRoute) map.removeLayer(layerRoute);
+
+    layerRoute = L.geoJSON(route.geometry, {
+      style: { color: '#4cc9f0', weight: 5 }
+    }).addTo(map);
+
+    aggiornaRiepilogoPercorso(route);
+    // (facoltativo) renderIstruzioni(route);
+
   } catch (err) {
     alert('Routing non disponibile: ' + err.message);
   }
@@ -558,26 +563,6 @@ function buildDeepLink(app, coord) {
     default      : return `comgooglemaps://?daddr=${latlng}&directionsmode=driving`;
   }
 }
-
-// Multi-stop deep link (best-effort): Google Maps full route with waypoints; others fallback to first stop
-function buildDeepLinkMulti(app, coords) {
-  if (!coords || !coords.length) return '';
-  const fmt = c => `${c.lat},${c.lng}`;
-  if (app === 'google') {
-    // Use universal HTTPS so it opens the app on mobile
-    const origin = fmt(coords[0]);
-    const destination = fmt(coords[coords.length - 1]);
-    const waypoints = coords.slice(1, -1).map(fmt).join('|');
-    const base = 'https://www.google.com/maps/dir/?api=1&travelmode=driving';
-    const url = waypoints
-      ? `${base}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&waypoints=${encodeURIComponent(waypoints)}`
-      : `${base}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
-    return url;
-  }
-  // Fallback single-destination for Waze/Apple/OSM
-  return buildDeepLink(app, coords[coords.length - 1]);
-}
-
 function askNavigationApp(orderedPts) {
   if (!navigationFlowActive) return; // iPhone-safe
 
@@ -750,31 +735,21 @@ document.addEventListener('DOMContentLoaded', () => {
   el.btnClear.onclick   = clearAll;
   el.btnMappa.onclick   = () => mostraMappa();
 
-  // TSP: esclude i PDV già visitati (tag verde) ma li lascia VISIBILI in mappa
   el.btnTSP.onclick = async () => {
     if (visite.length < 2) return alert('Servono almeno 2 punti');
 
-    const visited = visite.filter(v => !!v.visited && v.lat && v.lng);
-    const unvisited = visite.filter(v => !v.visited && v.lat && v.lng);
-    const senzaCoord = visite.filter(v => !v.lat || !v.lng);
+    const validi  = visite.filter(v => v.lat && v.lng);
+    const pts     = validi.map(v => ({ lat: v.lat, lng: v.lng, nome: v.nome }));
+    const ordered = tspOrder(pts);
 
-    if (unvisited.length < 1 && visited.length < 2) {
-      return alert('Servono almeno 2 punti con coordinate valide.');
-    }
+    // Riordina visite secondo TSP (match robusto su lat/lng/nome)
+    visite = ordered.map(o =>
+      validi.find(v => v.lat === o.lat && v.lng === o.lng && v.nome === o.nome)
+    ).concat(visite.filter(v => !v.lat || !v.lng)); // eventuali PDV senza coord in coda
 
-    const pts = unvisited.map(v => ({ lat: v.lat, lng: v.lng, nome: v.nome }));
-    const ordered = pts.length > 1 ? tspOrder(pts) : pts;
-    const orderedUnvisited = ordered.map(o => unvisited.find(v => v.lat === o.lat && v.lng === o.lng && v.nome === o.nome));
-    // Mantengo i visitati (stesso ordine), poi gli unvisited ottimizzati, poi i senza coord
-    visite = [...visited, ...orderedUnvisited, ...senzaCoord];
     save();
     render();
-
-    // Markers: TUTTI i punti con coord; Route: SOLO non visitati (se ci sono), altrimenti i visitati
-    const markersAll = visite.filter(v => v.lat && v.lng);
-    const routePts = orderedUnvisited.length ? orderedUnvisited : visited;
-    await mostraMappa(markersAll, routePts);
-    lastOrderedPts = routePts.map(v => ({ lat: v.lat, lng: v.lng }));
+    await mostraMappa(visite.filter(v => v.lat && v.lng));
   };
 
   el.btnNav.onclick = () => {
