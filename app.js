@@ -735,21 +735,36 @@ document.addEventListener('DOMContentLoaded', () => {
   el.btnClear.onclick   = clearAll;
   el.btnMappa.onclick   = () => mostraMappa();
 
+    // TSP: esclude i PDV già visitati (tag verde)
   el.btnTSP.onclick = async () => {
     if (visite.length < 2) return alert('Servono almeno 2 punti');
 
-    const validi  = visite.filter(v => v.lat && v.lng);
-    const pts     = validi.map(v => ({ lat: v.lat, lng: v.lng, nome: v.nome }));
-    const ordered = tspOrder(pts);
+    // Separazione punti per stato
+    const visited = visite.filter(v => !!v.visited && v.lat && v.lng);           // verdi → esclusi dall'ottimizzazione
+    const unvisited = visite.filter(v => !v.visited && v.lat && v.lng);          // rossi → da ottimizzare
+    const senzaCoord = visite.filter(v => !v.lat || !v.lng);                     // in fondo
 
-    // Riordina visite secondo TSP (match robusto su lat/lng/nome)
-    visite = ordered.map(o =>
-      validi.find(v => v.lat === o.lat && v.lng === o.lng && v.nome === o.nome)
-    ).concat(visite.filter(v => !v.lat || !v.lng)); // eventuali PDV senza coord in coda
+    if (unvisited.length < 2 && visited.length === 0) {
+      return alert('Servono almeno 2 punti non visitati con coordinate valide.');
+    }
+
+    // Calcolo ordine solo sui NON visitati
+    const pts = unvisited.map(v => ({ lat: v.lat, lng: v.lng, nome: v.nome }));
+    const ordered = pts.length > 1 ? tspOrder(pts) : pts;
+
+    // Ricostruzione lista: (1) visitati invariati, (2) non visitati in ordine ottimizzato, (3) senza coordinate
+    const orderedUnvisited = ordered.map(o => unvisited.find(v => v.lat === o.lat && v.lng === o.lng && v.nome === o.nome));
+    visite = [...visited, ...orderedUnvisited, ...senzaCoord];
 
     save();
     render();
-    await mostraMappa(visite.filter(v => v.lat && v.lng));
+
+    // Mostra/aggiorna mappa e percorso SOLO con i non visitati (escludendo i verdi)
+    const routePts = orderedUnvisited.length ? orderedUnvisited : visited; // se tutti visitati, mostra i visitati
+    await mostraMappa(routePts);
+
+    // Memorizza ultimi punti ordinati (per flusso Naviga)
+    lastOrderedPts = routePts.map(v => ({ lat: v.lat, lng: v.lng }));
   };
 
   el.btnNav.onclick = () => {
