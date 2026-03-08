@@ -31,6 +31,30 @@ function pick(obj, keys) {
  }
  return undefined;
 }
+
+
+// Costruisce stringhe indirizzo in modo flessibile (via opzionale)
+function buildAddress({ via, sede, cap, reg, free }) {
+  // Se esiste un indirizzo libero, mettilo al primo posto
+  const full = [free || via, sede, cap, reg, 'Italia'].filter(Boolean).join(', ');
+  const sedeCap = [sede, cap, reg, 'Italia'].filter(Boolean).join(', ');
+  const sedeReg = [sede, reg, 'Italia'].filter(Boolean).join(', ');
+  return { full, sedeCap, sedeReg };
+}
+
+// Prova più varianti di indirizzo finché trova coordinate
+async function geocodeWithFallback({ via, sede, cap, reg, free }) {
+  const variants = buildAddress({ via, sede, cap, reg, free });
+  // Ordine dei tentativi: indirizzo libero/completo -> Sede+CAP -> Sede+Regione
+  const tries = [variants.full, variants.sedeCap, variants.sedeReg];
+  for (const q of tries) {
+    if (!q || !q.trim()) continue;
+    const pos = await geocodeAddress(q);
+    if (pos) return { pos, usedQuery: q };
+    await sleep(250);
+  }
+  return { pos: null, usedQuery: '' };
+}
 /* -----------------------------
  ID univoco + migrazione
 ----------------------------- */
@@ -155,32 +179,24 @@ function ensureMap() {
  return map;
 }
 /* Marker numerati / visitati */
-function addNumberedMarkers(pts, visitedFlags, geoErrorFlags) {
-  // Rimuove i marker precedenti
-  map.eachLayer(layer => { if (layer instanceof L.Marker) map.removeLayer(layer); });
-  pts.forEach((p, idx) => {
-    const visited = visitedFlags[idx];
-    const isErr = geoErrorFlags ? !!geoErrorFlags[idx] : false;
-    let icon;
-    if (isErr) {
-      icon = L.divIcon({ className: 'marker-error', html: '<div style="background:#fff;border:2px solid #e63946;color:#e63946;width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:700">⚠️</div>', iconSize: [32,32], iconAnchor: [16,16] });
-    } else if (visited) {
-      icon = L.divIcon({ className: 'marker-visited', html: '✔️', iconSize: [32, 32], iconAnchor: [16, 16] });
-    } else {
-      icon = L.divIcon({ className: 'marker-notvisited', html: String(idx + 1), iconSize: [32, 32], iconAnchor: [16, 16] });
-    }
-    L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(`#${idx + 1}`);
-  });
+function addNumberedMarkers(pts, visitedFlags) {
+ // Rimuove i marker precedenti
+ map.eachLayer(layer => { if (layer instanceof L.Marker) map.removeLayer(layer); });
+ pts.forEach((p, idx) => {
+ const visited = visitedFlags[idx];
+ const icon = visited
+ ? L.divIcon({ className: 'marker-visited', html: '✔️', iconSize: [32, 32], iconAnchor: [16, 16] })
+ : L.divIcon({ className: 'marker-notvisited', html: `${idx + 1}`, iconSize: [32, 32], iconAnchor: [16, 16] });
+ L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(`#${idx + 1}`);
+ });
 }
 function refreshMarkersIfVisible() {
-  if (map && el.mappa && el.mappa.style.display !== 'none') {
-    const src = visite.filter(v => v.lat && v.lng);
-    const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
-    const visitedFlags = src.map(v => !!v.visited);
-    const geoErrFlags = src.map(v => !!v.geoError);
-    addNumberedMarkers(pts, visitedFlags, geoErrFlags);
-  }
-}
+ if (map && el.mappa && el.mappa.style.display !== 'none') {
+ const src = visite.filter(v => v.lat && v.lng);
+ const pts = src.map(v => ({ lat: v.lat, lng: v.lng }));
+ const visitedFlags = src.map(v => !!v.visited);
+ addNumberedMarkers(pts, visitedFlags);
+ }
 }
 /* ----------------------------- 
  MINI-SCHEDA riepilogo percorso 
@@ -233,17 +249,10 @@ function render() {
  const info = document.createElement('div');
  info.innerHTML = `\n <div class=\"title\">${v.nome||'Senza nome'}</div>\n <div class=\"addr\">${v.address||''}</div>\n `;
  const right = document.createElement('div'); right.className = 'tags';
- const tag = document.createElement('span');
-     tag.className = 'tag' + (v.visited ? ' visited' : '');
-     tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
-     tag.onclick = () => { v.visited = !v.visited; save(); render(); refreshMarkersIfVisible(); };
-     right.appendChild(tag);
-     if (v.geoError) {
-       const w = document.createElement('span');
-       w.className = 'tag danger';
-       w.textContent = 'Errore geocoding';
-       right.appendChild(w);
-     } row.appendChild(info); row.appendChild(right); li.appendChild(row);
+ const tag = document.createElement('span'); tag.className = 'tag' + (v.visited ? ' visited' : '');
+ tag.textContent = v.visited ? 'Visitato' : 'Da visitare';
+ tag.onclick = () => { v.visited = !v.visited; save(); render(); refreshMarkersIfVisible(); };
+ right.appendChild(tag); row.appendChild(info); row.appendChild(right); li.appendChild(row);
  const actions = document.createElement('div'); actions.className = 'actions';
  const bEdit = document.createElement('button'); bEdit.textContent = '✏ Modifica'; bEdit.onclick = () => { editingIndex = (editingIndex === i ? -1 : i); render(); };
  const bDel = document.createElement('button'); bDel.className = 'danger'; bDel.textContent = '❌ Elimina'; bDel.onclick = () => onDelete(i);
@@ -424,7 +433,7 @@ async function exportPDF() {
  let lat = v.lat, lng = v.lng;
  if (v.src !== 'gps' && (!isValidCoord(v))) { if (v.address) { const pos = await geocodeAddress(v.address); if (pos) { lat = pos.lat; lng = pos.lng; } } }
  if (isFinite(lat) && isFinite(lng)) pdf.text(`Lat: ${Number(lat).toFixed(6)} Lng: ${Number(lng).toFixed(6)} (${v.src === 'gps' ? 'GPS' : 'Auto'})`, 10, y);
- else { pdf.text('⚠ Non geolocalizzato', 10, y); }
+ else pdf.text('Coordinate non disponibili', 10, y);
  y += 6; if (v.note) { pdf.text(`Note: ${v.note}`, 10, y); y += 6; }
  if (v.foto) { try { pdf.addImage(v.foto, 'JPEG', 10, y, 60, 45); y += 50; } catch {} }
  pdf.line(10, y, 200, y); y += 6;
